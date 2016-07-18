@@ -212,16 +212,16 @@ void Interrupt_call(void)
 
 }
 
-//	void init_mode_pin()
-//	{
-//	GPIO_InitTypeDef GPIO_InitStruct;
+	void init_mode_pin()
+	{
+	GPIO_InitTypeDef GPIO_InitStruct;
 
-//	/*Configure GPIO pin : Pin_mode_sw_Pin */
-//	GPIO_InitStruct.Pin = Pin_mode_sw_Pin;
-//	GPIO_InitStruct.Mode = GPIO_MODE_INPUT;
-//	GPIO_InitStruct.Pull = GPIO_PULLUP;
-//	HAL_GPIO_Init(Pin_mode_sw_GPIO_Port, &GPIO_InitStruct);
-//	}
+	/*Configure GPIO pin : Pin_mode_sw_Pin */
+	GPIO_InitStruct.Pin = GPIO_PIN_14;
+	GPIO_InitStruct.Mode = GPIO_MODE_INPUT;
+	GPIO_InitStruct.Pull = GPIO_PULLUP;
+	HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
+	}
 
 void Initial_MPU6050(void)
 	{

@@ -121,10 +121,11 @@ int main(void)
 
   /* USER CODE BEGIN 2 */
 	HAL_NVIC_DisableIRQ(EXTI0_1_IRQn);
+//	init_mode_pin();
 	
 	HAL_Delay(200);
 
-	if (1)
+	if (HAL_GPIO_ReadPin(Pin_0_GPIO_Port, Pin_0_Pin) == GPIO_PIN_SET)
 	{
 		MX_USB_DEVICE_Init();
 		//MX_USART1_UART_Init();
@@ -512,7 +513,8 @@ static void MX_GPIO_Init(void)
   HAL_GPIO_Init(LED_R_GPIO_Port, &GPIO_InitStruct);
 
   /*Configure GPIO pin Output Level */
-  HAL_GPIO_WritePin(GPIOA, LED_L_Pin|Pin_0_Pin, GPIO_PIN_RESET);
+  HAL_GPIO_WritePin(GPIOA, LED_L_Pin, GPIO_PIN_RESET);
+	HAL_GPIO_WritePin(GPIOA, Pin_0_Pin, GPIO_PIN_SET);
 
   /*Configure GPIO pin Output Level */
   HAL_GPIO_WritePin(LED_R_GPIO_Port, LED_R_Pin, GPIO_PIN_RESET);
