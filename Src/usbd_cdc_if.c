@@ -169,30 +169,26 @@ static int8_t CDC_Init_FS(void)
   huart1.Init.Mode = UART_MODE_TX_RX;
   huart1.Init.HwFlowCtl = UART_HWCONTROL_NONE;
   huart1.Init.OverSampling = UART_OVERSAMPLING_16;
-  huart1.Init.OneBitSampling = UART_ONEBIT_SAMPLING_DISABLED ;
-  huart1.AdvancedInit.AdvFeatureInit = UART_ADVFEATURE_SWAP_INIT;
-  huart1.AdvancedInit.Swap = UART_ADVFEATURE_SWAP_ENABLE;
-  HAL_UART_Init(&huart1);
+  huart1.Init.OneBitSampling = UART_ONE_BIT_SAMPLE_DISABLE;
+  huart1.AdvancedInit.AdvFeatureInit = UART_ADVFEATURE_NO_INIT;
+	HAL_UART_Init(&huart1);
+
+	/* USART1_IRQn interrupt configuration */
+  HAL_NVIC_SetPriority(USART1_IRQn, 2, 0);
+  HAL_NVIC_EnableIRQ(USART1_IRQn);
 	
 	UserTxBufPtrIn = 0;
 	UserTxBufPtrOut = 0;
-	
 
-	
-	/*---------initialize tim17 base 100Hz ----------*/
-	htim17.Instance = TIM17;
-  htim17.Init.Prescaler = 479;
-  htim17.Init.CounterMode = TIM_COUNTERMODE_UP;
-  htim17.Init.Period = 999;
-  htim17.Init.ClockDivision = TIM_CLOCKDIVISION_DIV1;
-  htim17.Init.RepetitionCounter = 0;
-  HAL_TIM_Base_Init(&htim17);
-	HAL_TIM_Base_Start_IT(&htim17);
-	
   /* Set Application Buffers */
   USBD_CDC_SetTxBuffer(&hUsbDeviceFS, UserTxBufferFS, 0);
   USBD_CDC_SetRxBuffer(&hUsbDeviceFS, UserRxBufferFS);
+	
+
+  HAL_UART_Receive_IT(&huart1, (uint8_t *)(UserTxBufferFS + UserTxBufPtrIn), 1);
+	
   return (USBD_OK);
+		
   /* USER CODE END 3 */ 
 }
 
@@ -206,7 +202,6 @@ static int8_t CDC_DeInit_FS(void)
 {
   /* USER CODE BEGIN 4 */ 
 	
-	HAL_TIM_Base_Stop_IT(&htim17);
 	HAL_UART_DeInit(&huart1);
 	
   return (USBD_OK);
@@ -346,11 +341,12 @@ static int8_t CDC_Receive_FS (uint8_t* Buf, uint32_t *Len)
 {
   /* USER CODE BEGIN 6 */
 	
+//  USBD_CDC_SetRxBuffer(&hUsbDeviceFS, &Buf[0]);
+//  USBD_CDC_ReceivePacket(&hUsbDeviceFS);
+	
 	HAL_GPIO_TogglePin(LED_L_GPIO_Port, LED_L_Pin);
 	HAL_UART_Transmit_DMA(&huart1, Buf, *Len);
 	
-  USBD_CDC_SetRxBuffer(&hUsbDeviceFS, &Buf[0]);
-  USBD_CDC_ReceivePacket(&hUsbDeviceFS);
   return (USBD_OK);
   /* USER CODE END 6 */ 
 }
@@ -439,15 +435,20 @@ static void ComPort_Config(void)
 		break;
 	}
 
-	huart1.Init.BaudRate 	 = LineCoding.bitrate;
-	huart1.Init.Mode       = UART_MODE_TX_RX;
-	huart1.Init.HwFlowCtl  = UART_HWCONTROL_NONE;
-  huart1.Init.OverSampling   = UART_OVERSAMPLING_16;
-  huart1.Init.OneBitSampling = UART_ONEBIT_SAMPLING_DISABLED ;
-  huart1.AdvancedInit.AdvFeatureInit = UART_ADVFEATURE_SWAP_INIT;
-  huart1.AdvancedInit.Swap = UART_ADVFEATURE_SWAP_ENABLE;
-  
-  HAL_UART_Init(&huart1);
+	
+  huart1.Instance = USART1;
+  huart1.Init.BaudRate = LineCoding.bitrate;
+  huart1.Init.Mode = UART_MODE_TX_RX;
+  huart1.Init.HwFlowCtl = UART_HWCONTROL_NONE;
+  huart1.Init.OverSampling = UART_OVERSAMPLING_16;
+  huart1.Init.OneBitSampling = UART_ONE_BIT_SAMPLE_DISABLE;
+  huart1.AdvancedInit.AdvFeatureInit = UART_ADVFEATURE_NO_INIT;
+	HAL_UART_Init(&huart1);
+
+	
+	/* USART1_IRQn interrupt configuration */
+  HAL_NVIC_SetPriority(USART1_IRQn, 2, 0);
+  HAL_NVIC_EnableIRQ(USART1_IRQn);
 	
 	UserTxBufPtrIn = 0;
 	UserTxBufPtrOut = 0;
@@ -524,7 +525,8 @@ void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart)
   */
 void HAL_UART_TxCpltCallback(UART_HandleTypeDef *huart)
 {
-	USBD_CDC_ReceivePacket(&hUsbDeviceFS);
+
+  USBD_CDC_ReceivePacket(&hUsbDeviceFS);
 }
 /* USER CODE END PRIVATE_FUNCTIONS_IMPLEMENTATION */
 

@@ -110,11 +110,11 @@ int main(void)
   MX_SPI1_Init();
   MX_TIM2_Init();
   MX_TIM3_Init();
-  MX_USB_DEVICE_Init();
-  MX_USART1_UART_Init();
+//  MX_USB_DEVICE_Init();
+//  MX_USART1_UART_Init();
   MX_TIM14_Init();
   MX_TIM16_Init();
-  MX_TIM17_Init();
+//  MX_TIM17_Init();
 
   /* Initialize interrupts */
   MX_NVIC_Init();
@@ -127,8 +127,14 @@ int main(void)
 
 	if (HAL_GPIO_ReadPin(Pin_0_GPIO_Port, Pin_0_Pin) == GPIO_PIN_SET)
 	{
-		MX_USB_DEVICE_Init();
 		//MX_USART1_UART_Init();
+		MX_TIM17_Init();
+		HAL_NVIC_SetPriority(TIM17_IRQn, 2, 0);
+		HAL_NVIC_EnableIRQ(TIM17_IRQn);
+		
+		HAL_TIM_Base_Start_IT(&htim17);
+		
+		MX_USB_DEVICE_Init();
 		
 		while (1)
 		{
@@ -425,9 +431,9 @@ static void MX_TIM17_Init(void)
 {
 
   htim17.Instance = TIM17;
-  htim17.Init.Prescaler = 47;
+  htim17.Init.Prescaler = 479;
   htim17.Init.CounterMode = TIM_COUNTERMODE_UP;
-  htim17.Init.Period = 0xffff;
+  htim17.Init.Period = 999;
   htim17.Init.ClockDivision = TIM_CLOCKDIVISION_DIV1;
   htim17.Init.RepetitionCounter = 0;
   if (HAL_TIM_Base_Init(&htim17) != HAL_OK)
