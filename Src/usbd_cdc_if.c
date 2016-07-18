@@ -504,7 +504,7 @@ void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart)
 {
   /* Increment Index for buffer writing */
 	
-	HAL_GPIO_TogglePin(LED_L_GPIO_Port, LED_L_Pin);
+	HAL_GPIO_TogglePin(LED_R_GPIO_Port, LED_R_Pin);
   UserTxBufPtrIn++;
   
   /* To avoid buffer overflow */

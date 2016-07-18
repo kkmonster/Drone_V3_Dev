@@ -247,9 +247,6 @@ static void MX_NVIC_Init(void)
   /* USB_IRQn interrupt configuration */
   HAL_NVIC_SetPriority(USB_IRQn, 0, 0);
   HAL_NVIC_EnableIRQ(USB_IRQn);
-  /* TIM17_IRQn interrupt configuration */
-  HAL_NVIC_SetPriority(TIM17_IRQn, 2, 0);
-  HAL_NVIC_EnableIRQ(TIM17_IRQn);
   /* USART1_IRQn interrupt configuration */
   HAL_NVIC_SetPriority(USART1_IRQn, 2, 0);
   HAL_NVIC_EnableIRQ(USART1_IRQn);
@@ -433,7 +430,7 @@ static void MX_TIM17_Init(void)
   htim17.Instance = TIM17;
   htim17.Init.Prescaler = 479;
   htim17.Init.CounterMode = TIM_COUNTERMODE_UP;
-  htim17.Init.Period = 999;
+  htim17.Init.Period = 499;
   htim17.Init.ClockDivision = TIM_CLOCKDIVISION_DIV1;
   htim17.Init.RepetitionCounter = 0;
   if (HAL_TIM_Base_Init(&htim17) != HAL_OK)
@@ -532,9 +529,7 @@ static void MX_GPIO_Init(void)
 /* USER CODE BEGIN 4 */
 void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
 {
-
-  if (htim == &htim17) Tim17_loop();
-
+  if (htim == &htim17) Tim17_loop();				// USB to SERIAL Loopback
 }
 
 /* USER CODE END 4 */
