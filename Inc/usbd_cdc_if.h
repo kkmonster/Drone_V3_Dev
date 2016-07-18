@@ -40,10 +40,10 @@
 /* Includes ------------------------------------------------------------------*/
 #include "usbd_cdc.h"
 /* USER CODE BEGIN INCLUDE */
-	 
-void ComPort_Config(void);
-void Tim17_loop(void);
-	 
+
+ void ComPort_Config(void);
+ void Tim17_loop(void);
+      
 /* USER CODE END INCLUDE */
 
 /** @addtogroup STM32_USB_OTG_DEVICE_LIBRARY

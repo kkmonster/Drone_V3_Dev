@@ -110,11 +110,11 @@ int main(void)
   MX_SPI1_Init();
   MX_TIM2_Init();
   MX_TIM3_Init();
-//  MX_USB_DEVICE_Init();
-//  MX_USART1_UART_Init();
+  MX_USB_DEVICE_Init();
+  MX_USART1_UART_Init();
   MX_TIM14_Init();
   MX_TIM16_Init();
-//  MX_TIM17_Init();
+  MX_TIM17_Init();
 
   /* Initialize interrupts */
   MX_NVIC_Init();
@@ -242,10 +242,10 @@ static void MX_NVIC_Init(void)
   HAL_NVIC_SetPriority(USB_IRQn, 0, 0);
   HAL_NVIC_EnableIRQ(USB_IRQn);
   /* TIM17_IRQn interrupt configuration */
-  HAL_NVIC_SetPriority(TIM17_IRQn, 3, 0);
+  HAL_NVIC_SetPriority(TIM17_IRQn, 2, 0);
   HAL_NVIC_EnableIRQ(TIM17_IRQn);
   /* USART1_IRQn interrupt configuration */
-  HAL_NVIC_SetPriority(USART1_IRQn, 1, 0);
+  HAL_NVIC_SetPriority(USART1_IRQn, 2, 0);
   HAL_NVIC_EnableIRQ(USART1_IRQn);
   /* SPI1_IRQn interrupt configuration */
   HAL_NVIC_SetPriority(SPI1_IRQn, 1, 0);
@@ -488,7 +488,7 @@ static void MX_GPIO_Init(void)
   /*Configure GPIO pin : IMU_INT_Pin */
   GPIO_InitStruct.Pin = IMU_INT_Pin;
   GPIO_InitStruct.Mode = GPIO_MODE_IT_RISING;
-  GPIO_InitStruct.Pull = GPIO_NOPULL;
+  GPIO_InitStruct.Pull = GPIO_PULLDOWN;
   HAL_GPIO_Init(IMU_INT_GPIO_Port, &GPIO_InitStruct);
 
   /*Configure GPIO pin : LED_L_Pin */
@@ -513,8 +513,10 @@ static void MX_GPIO_Init(void)
   HAL_GPIO_Init(LED_R_GPIO_Port, &GPIO_InitStruct);
 
   /*Configure GPIO pin Output Level */
-  HAL_GPIO_WritePin(GPIOA, LED_L_Pin, GPIO_PIN_RESET);
-	HAL_GPIO_WritePin(GPIOA, Pin_0_Pin, GPIO_PIN_SET);
+  HAL_GPIO_WritePin(LED_L_GPIO_Port, LED_L_Pin, GPIO_PIN_RESET);
+
+  /*Configure GPIO pin Output Level */
+  HAL_GPIO_WritePin(Pin_0_GPIO_Port, Pin_0_Pin, GPIO_PIN_SET);
 
   /*Configure GPIO pin Output Level */
   HAL_GPIO_WritePin(LED_R_GPIO_Port, LED_R_Pin, GPIO_PIN_RESET);
