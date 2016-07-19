@@ -188,6 +188,7 @@ void Read_udp(void)
 
   if (numberOfBytes > 0)
   {
+    udp.read(data, numberOfBytes);
     if (data[0] == 0XF0 && data[1] == 0XF0) // tuning data
     {
       TuningData tuningDataBuffer = {0};
@@ -315,24 +316,24 @@ void Read_udp(void)
         }
       }
     } 
-//    else if (data[0] == 0XF1) {
-//      ControlData FunctionData = {0};
-//      memcpy(&FunctionData, data, sizeof(ControlData));
-//      FunctionData.ssid[DEFAULT_SSID_LENGTH - 1] = '\0';
-//      if (isSSID(FunctionData.ssid)) {
-//        sentFunctioncommand(0XF1);
-//        Serial.println("F1");
-//      }
-//
-//    } else if (data[0] == 0XF2) {
-//      ControlData FunctionData = {0};
-//      memcpy(&FunctionData, data, sizeof(ControlData));
-//      FunctionData.ssid[DEFAULT_SSID_LENGTH - 1] = '\0';
-//      if (isSSID(FunctionData.ssid)) {
-//        sentFunctioncommand(0XF2);
-//        Serial.println("F2");
-//      }
-//    }
+    else if (data[0] == 0XF1) {
+      ControlData FunctionData = {0};
+      memcpy(&FunctionData, data, sizeof(ControlData));
+      FunctionData.ssid[DEFAULT_SSID_LENGTH - 1] = '\0';
+      if (isSSID(FunctionData.ssid)) {
+        sentFunctioncommand(0XF1);
+        Serial.println("F1");
+      }
+
+    } else if (data[0] == 0XF2) {
+      ControlData FunctionData = {0};
+      memcpy(&FunctionData, data, sizeof(ControlData));
+      FunctionData.ssid[DEFAULT_SSID_LENGTH - 1] = '\0';
+      if (isSSID(FunctionData.ssid)) {
+        sentFunctioncommand(0XF2);
+        Serial.println("F2");
+      }
+    }
   }
 }
 
