@@ -10,6 +10,10 @@
 #ifndef __BS_DRONE_LIB_H
 #define __BS_DRONE_LIB_H
 
+#define calibation_mode                  0    			    
+#define stabilize_mode                   1
+
+
 #define ACCELEROMETER_SENSITIVITY   8192.0f  
 #define GYROSCOPE_SENSITIVITY       16.4f  
 #define Compass_SENSITIVITY       	1090.0f
@@ -46,6 +50,8 @@ extern UART_HandleTypeDef huart1;
 extern DMA_HandleTypeDef hdma_usart1_tx;
 
 volatile uint8_t _Sampling_task_do = 0;
+
+uint8_t Mode = calibation_mode;
 
 int16_t rawAccx_X = 1;
 int16_t rawAccx_Y = 1;
@@ -96,7 +102,6 @@ volatile uint8_t  spi_rx_data_index = 0;
 
 uint16_t watchdog  = 0;
 int16_t xxx = 0;
-int8_t _calibation  = 0;
 
 /* USER CODE for Receiver  */
 volatile uint8_t _index = 0 ;
@@ -139,130 +144,152 @@ void getPIDgain(uint8_t spi_rx_data_index);
 void getRCcommand(uint8_t spi_rx_data_index);
 void readCommand (void);
 float abs_user(float x);
+uint32_t milli(void);
+void calibation_fn(void);
+void stabilize_fn(void);
 
 void Sampling_task(void)
 {
-	static int8_t ld_blink;
-	
-		ld_blink++;
-		if(ld_blink == 20)
-		{
-			ld_blink = 0;
-			HAL_GPIO_TogglePin(LED_L_GPIO_Port, LED_L_Pin);
-		}
+
+
+	switch (Mode)
+    {
+    	case calibation_mode :
+			
+			calibation_fn();
 		
+    		break;
+    	case stabilize_mode :
+			stabilize_fn();
+		
+    		break;
+    	default:
+			calibation_fn();
+    		break;
+    }
 		/* Read data from sensor */
 		Read_MPU6050();
 
 	
-		/* Controller */
-	if(_calibation == 0)
-	{
-		
-		count++;
-		if(count == 10)
-		{
-			count = 0;
-			HAL_GPIO_TogglePin(LED_R_GPIO_Port, LED_R_Pin);
-		}
-		
-		float gx_x = abs_user(rawGyrox_X-gyx_d);
-		float gy_x = abs_user(rawGyrox_Y-gyy_d);	
-		float gz_x = abs_user(rawGyrox_Z-gyz_d);		
-		float ax_x = abs_user(rawAccx_X-acx_d);
-		float ay_x = abs_user(rawAccx_Y-acy_d);
-		
-		float deadband = 2;
-		
-		if ((gx_x < deadband)&&(gy_x < deadband)&&(gz_x < deadband)&&(ax_x < deadband)&&(ay_x < deadband))
-		{
-			_calibation = 1;
-			gx_diff = gyx_d;
-			gy_diff = gyy_d;
-			gz_diff = gyz_d;
-			ax_diff = acx_d;
-			ay_diff = acy_d;
-		
-			HAL_SPI_Receive_IT(&hspi1, (uint8_t*)(spi_rx_data + spi_rx_data_index), 1);
-
-			LED_R_off();
-		}
-		
-		_gyx_d = gyx_d;
-		_gyy_d = gyy_d;
-		_gyz_d = gyz_d;
-		_acx_d = acx_d; 
-		_acy_d = acy_d;
-		
-	}else{
-			
-		AHRS(); 
-		
-		PID_controller();
-
-    if (watchdog > 0) watchdog --;
-		if((T_center < 30) || (watchdog == 0))		
-		{		
-			motor_A=0;
-			motor_B=0;
-			motor_C=0;
-			motor_D=0;
-		}
-		
-		Drive_motor_output(); 
-	}
 
 }
 
-	void init_mode_pin()
-	{
-	GPIO_InitTypeDef GPIO_InitStruct;
+void init_mode_pin()
+{
+GPIO_InitTypeDef GPIO_InitStruct;
 
-	/*Configure GPIO pin : Pin_mode_sw_Pin */
-	GPIO_InitStruct.Pin = GPIO_PIN_14;
-	GPIO_InitStruct.Mode = GPIO_MODE_INPUT;
-	GPIO_InitStruct.Pull = GPIO_PULLUP;
-	HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
+/*Configure GPIO pin : Pin_mode_sw_Pin */
+GPIO_InitStruct.Pin = GPIO_PIN_14;
+GPIO_InitStruct.Mode = GPIO_MODE_INPUT;
+GPIO_InitStruct.Pull = GPIO_PULLUP;
+HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
+}
+	
+void calibation_fn(void)
+{
+	Read_MPU6050();
+	count++;
+	if(count == 10)
+	{
+		count = 0;
+		HAL_GPIO_TogglePin(LED_R_GPIO_Port, LED_R_Pin);
 	}
 
-void Initial_MPU6050(void)
-	{
-		HAL_Delay(150); // for stability
-		//    Reset to defalt 
-		MPU6050_WriteBit(MPU6050_DEFAULT_ADDRESS, MPU6050_RA_PWR_MGMT_1, MPU6050_PWR1_DEVICE_RESET_BIT, ENABLE);
-		HAL_Delay(150);
-		
-		//    ENABLE
-		MPU6050_WriteBit(MPU6050_DEFAULT_ADDRESS, MPU6050_RA_PWR_MGMT_1, MPU6050_PWR1_SLEEP_BIT, DISABLE);
-		HAL_Delay(1);
-		//	  SetClockSource(MPU6050_CLOCK_PLL_ZGYRO)
-		MPU6050_WriteBits(MPU6050_DEFAULT_ADDRESS, MPU6050_RA_PWR_MGMT_1, MPU6050_PWR1_CLKSEL_BIT, MPU6050_PWR1_CLKSEL_LENGTH, MPU6050_CLOCK_PLL_ZGYRO);
-		HAL_Delay(1);		
+	float gx_x = abs_user(rawGyrox_X-gyx_d);
+	float gy_x = abs_user(rawGyrox_Y-gyy_d);	
+	float gz_x = abs_user(rawGyrox_Z-gyz_d);		
+	float ax_x = abs_user(rawAccx_X-acx_d);
+	float ay_x = abs_user(rawAccx_Y-acy_d);
 
-		//    SetFullScaleAccelRange(MPU6050_ACCEL_FS_8)
-		MPU6050_WriteBits(MPU6050_DEFAULT_ADDRESS, MPU6050_RA_ACCEL_CONFIG, MPU6050_GCONFIG_FS_SEL_BIT, MPU6050_GCONFIG_FS_SEL_LENGTH, MPU6050_ACCEL_FS_8);
-		HAL_Delay(1);
-		
-		//    SetFullScaleGyroRange(MPU6050_GYRO_FS_2000)
-		MPU6050_WriteBits(MPU6050_DEFAULT_ADDRESS, MPU6050_RA_GYRO_CONFIG, MPU6050_GCONFIG_FS_SEL_BIT, MPU6050_GCONFIG_FS_SEL_LENGTH, MPU6050_GYRO_FS_2000);
-		HAL_Delay(1);
-		
-		MPU6050_WriteBits(MPU6050_DEFAULT_ADDRESS, MPU6050_RA_CONFIG, MPU6050_CFG_DLPF_CFG_BIT, MPU6050_CFG_DLPF_CFG_LENGTH, MPU6050_DLPF_BW_42);
-		HAL_Delay(1);
-				
-	  MPU6050_WriteBits(MPU6050_DEFAULT_ADDRESS, MPU6050_RA_SMPLRT_DIV, 7, 8, 3);
-		HAL_Delay(1);
-   
-		//    interupt(Enable)
-		MPU6050_WriteBit(MPU6050_DEFAULT_ADDRESS, MPU6050_RA_INT_ENABLE, MPU6050_INTERRUPT_DATA_RDY_BIT, ENABLE);
-		HAL_Delay(1);
+	float deadband = 2;
+
+	if ((gx_x < deadband)&&(gy_x < deadband)&&(gz_x < deadband)&&(ax_x < deadband)&&(ay_x < deadband))
+	{
+		Mode = stabilize_mode;
+		gx_diff = gyx_d;
+		gy_diff = gyy_d;
+		gz_diff = gyz_d;
+		ax_diff = acx_d;
+		ay_diff = acy_d;
+
+		HAL_SPI_Receive_IT(&hspi1, (uint8_t*)(spi_rx_data + spi_rx_data_index), 1);
+
+		LED_R_off();
+	}
+
+	_gyx_d = gyx_d;
+	_gyy_d = gyy_d;
+	_gyz_d = gyz_d;
+	_acx_d = acx_d; 
+	_acy_d = acy_d;
+}
+
+void stabilize_fn(void)
+{
+	static int8_t ld_blink;
+
+	Read_MPU6050();
+	ld_blink++;
+	if(ld_blink == 20)
+	{
+		ld_blink = 0;
+		HAL_GPIO_TogglePin(LED_L_GPIO_Port, LED_L_Pin);
+	}
+	AHRS(); 
+	
+	PID_controller();
+
+	if (watchdog > 0) watchdog --;
+	
+	if((T_center < 30) || (watchdog == 0))		
+	{		
+		motor_A=0;
+		motor_B=0;
+		motor_C=0;
+		motor_D=0;
+	}
+
+	Drive_motor_output(); 
+}
+
+void Initial_MPU6050(void)
+{
+	HAL_Delay(150); // for stability
+	//    Reset to defalt 
+	MPU6050_WriteBit(MPU6050_DEFAULT_ADDRESS, MPU6050_RA_PWR_MGMT_1, MPU6050_PWR1_DEVICE_RESET_BIT, ENABLE);
+	HAL_Delay(150);
+	
+	//    ENABLE
+	MPU6050_WriteBit(MPU6050_DEFAULT_ADDRESS, MPU6050_RA_PWR_MGMT_1, MPU6050_PWR1_SLEEP_BIT, DISABLE);
+	HAL_Delay(1);
+	//	  SetClockSource(MPU6050_CLOCK_PLL_ZGYRO)
+	MPU6050_WriteBits(MPU6050_DEFAULT_ADDRESS, MPU6050_RA_PWR_MGMT_1, MPU6050_PWR1_CLKSEL_BIT, MPU6050_PWR1_CLKSEL_LENGTH, MPU6050_CLOCK_PLL_ZGYRO);
+	HAL_Delay(1);		
+
+	//    SetFullScaleAccelRange(MPU6050_ACCEL_FS_8)
+	MPU6050_WriteBits(MPU6050_DEFAULT_ADDRESS, MPU6050_RA_ACCEL_CONFIG, MPU6050_GCONFIG_FS_SEL_BIT, MPU6050_GCONFIG_FS_SEL_LENGTH, MPU6050_ACCEL_FS_8);
+	HAL_Delay(1);
+	
+	//    SetFullScaleGyroRange(MPU6050_GYRO_FS_2000)
+	MPU6050_WriteBits(MPU6050_DEFAULT_ADDRESS, MPU6050_RA_GYRO_CONFIG, MPU6050_GCONFIG_FS_SEL_BIT, MPU6050_GCONFIG_FS_SEL_LENGTH, MPU6050_GYRO_FS_2000);
+	HAL_Delay(1);
+	
+	MPU6050_WriteBits(MPU6050_DEFAULT_ADDRESS, MPU6050_RA_CONFIG, MPU6050_CFG_DLPF_CFG_BIT, MPU6050_CFG_DLPF_CFG_LENGTH, MPU6050_DLPF_BW_42);
+	HAL_Delay(1);
+			
+	MPU6050_WriteBits(MPU6050_DEFAULT_ADDRESS, MPU6050_RA_SMPLRT_DIV, 7, 8, 3);
+	HAL_Delay(1);
+
+	//    interupt(Enable)
+	MPU6050_WriteBit(MPU6050_DEFAULT_ADDRESS, MPU6050_RA_INT_ENABLE, MPU6050_INTERRUPT_DATA_RDY_BIT, ENABLE);
+	HAL_Delay(1);
 				
 }
 
 void MPU6050_WriteBits(uint8_t slaveAddr, uint8_t regAddr, uint8_t bitStart, uint8_t length, uint8_t data)
 {
     uint8_t tmp;
-		HAL_I2C_Mem_Read(&hi2c1, slaveAddr, regAddr, 1, &tmp, 1, 1);
+	HAL_I2C_Mem_Read(&hi2c1, slaveAddr, regAddr, 1, &tmp, 1, 1);
     uint8_t mask = ((1 << length) - 1) << (bitStart - length + 1);
     data <<= (bitStart - length + 1); // shift data into correct position
     data &= mask;   // zero all non-important bits in data
@@ -274,7 +301,7 @@ void MPU6050_WriteBits(uint8_t slaveAddr, uint8_t regAddr, uint8_t bitStart, uin
 void MPU6050_WriteBit(uint8_t slaveAddr, uint8_t regAddr, uint8_t bitNum, uint8_t data)
 {
     uint8_t tmp;
-		HAL_I2C_Mem_Read(&hi2c1, slaveAddr, regAddr, 1, &tmp, 1, 1);
+	HAL_I2C_Mem_Read(&hi2c1, slaveAddr, regAddr, 1, &tmp, 1, 1);
     tmp = (data != 0) ? (tmp | (1 << bitNum)) : (tmp & ~(1 << bitNum));
     HAL_I2C_Mem_Write(&hi2c1,slaveAddr,regAddr,1,&tmp,1,1);
 }
@@ -282,7 +309,7 @@ void MPU6050_WriteBit(uint8_t slaveAddr, uint8_t regAddr, uint8_t bitNum, uint8_
 void MPU6050_ReadBits(uint8_t slaveAddr, uint8_t regAddr, uint8_t bitStart, uint8_t length, uint8_t *data)
 {
     uint8_t tmp;
-		HAL_I2C_Mem_Read(&hi2c1, slaveAddr, regAddr, 1, &tmp, 1, 1);
+	HAL_I2C_Mem_Read(&hi2c1, slaveAddr, regAddr, 1, &tmp, 1, 1);
     uint8_t mask = ((1 << length) - 1) << (bitStart - length + 1);
     tmp &= mask;
     tmp >>= (bitStart - length + 1);
@@ -292,16 +319,16 @@ void MPU6050_ReadBits(uint8_t slaveAddr, uint8_t regAddr, uint8_t bitStart, uint
 void MPU6050_ReadBit(uint8_t slaveAddr, uint8_t regAddr, uint8_t bitNum, uint8_t *data)
 {
     uint8_t tmp;
-		HAL_I2C_Mem_Read(&hi2c1,slaveAddr,regAddr,1,&tmp,1,1);
+	HAL_I2C_Mem_Read(&hi2c1,slaveAddr,regAddr,1,&tmp,1,1);
     *data = tmp & (1 << bitNum);
 }
 
 
 void Read_MPU6050(void)
 {
-		int16_t AccelGyro[6]={0};  
+	int16_t AccelGyro[6]={0};  
     uint8_t tmpBuffer[14];
-	  HAL_I2C_Mem_Read(&hi2c1,MPU6050_DEFAULT_ADDRESS,MPU6050_RA_ACCEL_XOUT_H,1,tmpBuffer,14,2);
+	HAL_I2C_Mem_Read(&hi2c1,MPU6050_DEFAULT_ADDRESS,MPU6050_RA_ACCEL_XOUT_H,1,tmpBuffer,14,2);
     /* Get acceleration */
     for (int i = 0; i < 3; i++)
         AccelGyro[i] = ((int16_t) ((uint16_t) tmpBuffer[2 * i] << 8) + tmpBuffer[2 * i + 1]);
@@ -309,34 +336,36 @@ void Read_MPU6050(void)
     for (int i = 4; i < 7; i++)
         AccelGyro[i - 1] = ((int16_t) ((uint16_t) tmpBuffer[2 * i] << 8) + tmpBuffer[2 * i + 1]);
 				
-		rawAccx_X  =  AccelGyro[0];
-		rawAccx_Y  =  AccelGyro[1];
-		rawAccx_Z  =  AccelGyro[2];
-		rawGyrox_X =  AccelGyro[3];
-		rawGyrox_Y =  AccelGyro[4];
-		rawGyrox_Z =  AccelGyro[5];
+	rawAccx_X  =  AccelGyro[0];
+	rawAccx_Y  =  AccelGyro[1];
+	rawAccx_Z  =  AccelGyro[2];
+	rawGyrox_X =  AccelGyro[3];
+	rawGyrox_Y =  AccelGyro[4];
+	rawGyrox_Z =  AccelGyro[5];
+
+	beta = 0.2f;
 	
-	  beta = 0.2f;
-	  if (T_center < 40) 
-		{
-			beta =  2.0f;			
-		}
-		if (_calibation == 0) 
-		{
-			gyx_d = Smooth_filter(0.005f, rawGyrox_X, gyx_d);
-			gyy_d = Smooth_filter(0.005f, rawGyrox_Y, gyy_d);	
-			gyz_d = Smooth_filter(0.005f, rawGyrox_Z, gyz_d);
-			acx_d = Smooth_filter(0.005f, rawAccx_X, acx_d);
-			acy_d = Smooth_filter(0.005f, rawAccx_Y, acy_d);	
-			f = Smooth_filter(0.001f, rawAccx_Z, f);		
-		}
+	if (T_center < 40) 
+	{
+		beta =  2.0f;			
+	}
 	
-		rawGyrox_X -= gx_diff;
-		rawGyrox_Y -= gy_diff;
-		rawGyrox_Z -= gz_diff;
-		
-		rawAccx_X -= ax_diff;
-		rawAccx_Y -= ay_diff;
+	if (Mode == stabilize_mode) 
+	{
+		gyx_d = Smooth_filter(0.005f, rawGyrox_X, gyx_d);
+		gyy_d = Smooth_filter(0.005f, rawGyrox_Y, gyy_d);	
+		gyz_d = Smooth_filter(0.005f, rawGyrox_Z, gyz_d);
+		acx_d = Smooth_filter(0.005f, rawAccx_X, acx_d);
+		acy_d = Smooth_filter(0.005f, rawAccx_Y, acy_d);	
+		f = Smooth_filter(0.001f, rawAccx_Z, f);		
+	}
+	
+	rawGyrox_X -= gx_diff;
+	rawGyrox_Y -= gy_diff;
+	rawGyrox_Z -= gz_diff;
+	
+	rawAccx_X -= ax_diff;
+	rawAccx_Y -= ay_diff;
 
 }
 
@@ -362,9 +391,8 @@ void PID_controller(void)
 	Errer_pitch =  -(float)ch2 * 0.3f - ((float)cal_pitch)	;
 	Error_roll 	=  -(float)ch1 * 0.3f + ((float)cal_roll)	;
 
-  // protect  wind-up
-
-	if (T_center	> 500){
+	if (T_center > 500)
+	{
 		Sum_Error_yaw =   constrain((Sum_Error_yaw   + (Error_yaw   /sampleFreq)), -100.0f , 100.0f) ;
 		Sum_Error_pitch = constrain((Sum_Error_pitch + (Errer_pitch /sampleFreq)), -100.0f , 100.0f) ;
 		Sum_Error_roll =  constrain((Sum_Error_roll  + (Error_roll  /sampleFreq)), -100.0f , 100.0f) ;
@@ -374,14 +402,21 @@ void PID_controller(void)
 	D_Error_pitch =(Errer_pitch-Buf_D_Errer_pitch)*sampleFreq;
 	D_Error_roll = (Error_roll-Buf_D_Error_roll)  *sampleFreq;
 
-	Del_yaw		= (Kp_yaw   * Error_yaw)		+ (Ki_yaw	  * Sum_Error_yaw)   + constrain((Kd_yaw * D_Error_yaw), -1500, 1500);
+	Del_yaw		= (Kp_yaw   * Error_yaw)	+ (Ki_yaw	  * Sum_Error_yaw) + constrain((Kd_yaw * D_Error_yaw), -1500, 1500);
 	Del_pitch	= (Kp_pitch * Errer_pitch)	+ (Ki_pitch	* Sum_Error_pitch) + constrain((Kd_pitch * D_Error_pitch), -1500, 1500);
-	Del_roll	= (Kp_roll  * Error_roll)		+ (Ki_roll	* Sum_Error_roll)  + constrain((Kd_roll * D_Error_roll), -1500, 1500);
+	Del_roll	= (Kp_roll  * Error_roll)	+ (Ki_roll	* Sum_Error_roll)  + constrain((Kd_roll * D_Error_roll), -1500, 1500);
 
-	motor_A = T_center +Del_pitch	+Del_roll +Del_yaw;
-	motor_B = T_center +Del_pitch	-Del_roll -Del_yaw;
-	motor_C = T_center -Del_pitch	-Del_roll +Del_yaw;
-	motor_D = T_center -Del_pitch	+Del_roll -Del_yaw;	
+	
+	motor_A = T_center +Del_pitch	+Del_roll -Del_yaw;
+	motor_B = T_center +Del_pitch	-Del_roll +Del_yaw;
+	motor_C = T_center -Del_pitch	-Del_roll -Del_yaw;
+	motor_D = T_center -Del_pitch	+Del_roll +Del_yaw;	
+	
+// for v929
+//	motor_A = T_center +Del_pitch	+Del_roll +Del_yaw;
+//	motor_B = T_center +Del_pitch	-Del_roll -Del_yaw;
+//	motor_C = T_center -Del_pitch	-Del_roll +Del_yaw;
+//	motor_D = T_center -Del_pitch	+Del_roll -Del_yaw;	
 	
 	
 //	Del_yaw		= (Kp_yaw   * Error_yaw)		+ (Ki_yaw	  * Sum_Error_yaw)   + constrain((Kd_yaw * D_Error_yaw), -1000, 1000);
@@ -397,41 +432,28 @@ void PID_controller(void)
 
 void Drive_motor_output(void)
 {
-	
-  //motor_A = 100 ;
+	//motor_A = 100 ;
 	//motor_B = 100 ;
 	//motor_C = 100 ;
 	//motor_D = 100 ;
-	
-	// limmit output max, min
-	if(motor_A < 0) motor_A = 0 ;
-	if(motor_B < 0) motor_B = 0 ;
-	if(motor_C < 0) motor_C = 0 ;
-	if(motor_D < 0) motor_D = 0 ;
-	
-	if(motor_A > 2399) motor_A = 2399 ;
-	if(motor_B > 2399) motor_B = 2399 ;
-	if(motor_C > 2399) motor_C = 2399 ;
-	if(motor_D > 2399) motor_D = 2399 ;
-	
-	TIM2->CCR1 = motor_C ;
-	TIM2->CCR2 = motor_D ;
-	TIM3->CCR1 = motor_A ;
-	TIM3->CCR2 = motor_B ;
-
+		
+	TIM2->CCR1 = constrain(motor_C, 0, 2399);
+	TIM2->CCR2 = constrain(motor_D, 0, 2399);
+	TIM3->CCR1 = constrain(motor_A, 0, 2399);
+	TIM3->CCR2 = constrain(motor_B, 0, 2399);
 }
 
 void AHRS()
 {
-	  float dt = 0.004f; 
-		float gx = (((float)rawGyrox_X)/GYROSCOPE_SENSITIVITY)*(M_PIf/180.0f);
-		float gy = (((float)rawGyrox_Y)/GYROSCOPE_SENSITIVITY)*(M_PIf/180.0f);
-		float gz = (((float)rawGyrox_Z)/GYROSCOPE_SENSITIVITY)*(M_PIf/180.0f);
-		float ax = ((float)rawAccx_X)/ACCELEROMETER_SENSITIVITY;
-		float ay = ((float)rawAccx_Y)/ACCELEROMETER_SENSITIVITY;
-		float az = ((float)rawAccx_Z)/ACCELEROMETER_SENSITIVITY;
+	float dt = 0.004f; 
+	float gx = (((float)rawGyrox_X)/GYROSCOPE_SENSITIVITY)*(M_PIf/180.0f);
+	float gy = (((float)rawGyrox_Y)/GYROSCOPE_SENSITIVITY)*(M_PIf/180.0f);
+	float gz = (((float)rawGyrox_Z)/GYROSCOPE_SENSITIVITY)*(M_PIf/180.0f);
+	float ax = ((float)rawAccx_X)/ACCELEROMETER_SENSITIVITY;
+	float ay = ((float)rawAccx_Y)/ACCELEROMETER_SENSITIVITY;
+	float az = ((float)rawAccx_Z)/ACCELEROMETER_SENSITIVITY;
 
-		static uint8_t useAcc = 1;
+	static uint8_t useAcc = 1;
     float recipNorm;
     float ex = 0, ey = 0, ez = 0;
     float qa, qb, qc;
@@ -497,6 +519,7 @@ float sq (float x)
  {
 	 return x*x;
  }
+ 
 void imuComputeRotationMatrix(void)
 {
     float q1q1 = sq(q1);
@@ -536,19 +559,19 @@ float invSqrt(float x)
 
 void getPIDgain(uint8_t spi_rx_data_index)
 {
-	  int16_t Kp_yaw_tmp = (int16_t)spi_rx_data[spi_rx_data_index-21]<<8 | (int16_t)spi_rx_data[spi_rx_data_index-20]; 
-		int16_t	Ki_yaw_tmp = (int16_t)spi_rx_data[spi_rx_data_index-19]<<8 | (int16_t)spi_rx_data[spi_rx_data_index-18];
-		int16_t	Kd_yaw_tmp = (int16_t)spi_rx_data[spi_rx_data_index-17]<<8 | (int16_t)spi_rx_data[spi_rx_data_index-16];
+	int16_t Kp_yaw_tmp = (int16_t)spi_rx_data[spi_rx_data_index-21]<<8 | (int16_t)spi_rx_data[spi_rx_data_index-20]; 
+	int16_t	Ki_yaw_tmp = (int16_t)spi_rx_data[spi_rx_data_index-19]<<8 | (int16_t)spi_rx_data[spi_rx_data_index-18];
+	int16_t	Kd_yaw_tmp = (int16_t)spi_rx_data[spi_rx_data_index-17]<<8 | (int16_t)spi_rx_data[spi_rx_data_index-16];
 
-		int16_t	Kp_pitch_tmp = (int16_t)spi_rx_data[spi_rx_data_index-15]<<8 | (int16_t)spi_rx_data[spi_rx_data_index-14];
-		int16_t	Ki_pitch_tmp = (int16_t)spi_rx_data[spi_rx_data_index-13]<<8 | (int16_t)spi_rx_data[spi_rx_data_index-12];
-		int16_t	Kd_pitch_tmp = (int16_t)spi_rx_data[spi_rx_data_index-11]<<8 | (int16_t)spi_rx_data[spi_rx_data_index-10];
+	int16_t	Kp_pitch_tmp = (int16_t)spi_rx_data[spi_rx_data_index-15]<<8 | (int16_t)spi_rx_data[spi_rx_data_index-14];
+	int16_t	Ki_pitch_tmp = (int16_t)spi_rx_data[spi_rx_data_index-13]<<8 | (int16_t)spi_rx_data[spi_rx_data_index-12];
+	int16_t	Kd_pitch_tmp = (int16_t)spi_rx_data[spi_rx_data_index-11]<<8 | (int16_t)spi_rx_data[spi_rx_data_index-10];
 
-		int16_t	Kp_roll_tmp = (int16_t)spi_rx_data[spi_rx_data_index-9]<<8 | (int16_t)spi_rx_data[spi_rx_data_index-8];
-		int16_t	Ki_roll_tmp = (int16_t)spi_rx_data[spi_rx_data_index-7]<<8 | (int16_t)spi_rx_data[spi_rx_data_index-6];
-		int16_t	Kd_roll_tmp = (int16_t)spi_rx_data[spi_rx_data_index-5]<<8 | (int16_t)spi_rx_data[spi_rx_data_index-4];
-		int16_t sum = (int16_t)Kp_roll_tmp + (int16_t)Ki_roll_tmp + (int16_t)Kd_roll_tmp + (int16_t)Kp_pitch_tmp + (int16_t)Ki_pitch_tmp + (int16_t)Kd_pitch_tmp + (int16_t)Kp_yaw_tmp + (int16_t)Ki_yaw_tmp + (int16_t)Kd_yaw_tmp;
-		int16_t	checksum_buffer =(((int16_t)spi_rx_data[spi_rx_data_index-3])<<8 | (int16_t)spi_rx_data[spi_rx_data_index-2]);
+	int16_t	Kp_roll_tmp = (int16_t)spi_rx_data[spi_rx_data_index-9]<<8 | (int16_t)spi_rx_data[spi_rx_data_index-8];
+	int16_t	Ki_roll_tmp = (int16_t)spi_rx_data[spi_rx_data_index-7]<<8 | (int16_t)spi_rx_data[spi_rx_data_index-6];
+	int16_t	Kd_roll_tmp = (int16_t)spi_rx_data[spi_rx_data_index-5]<<8 | (int16_t)spi_rx_data[spi_rx_data_index-4];
+	int16_t sum = (int16_t)Kp_roll_tmp + (int16_t)Ki_roll_tmp + (int16_t)Kd_roll_tmp + (int16_t)Kp_pitch_tmp + (int16_t)Ki_pitch_tmp + (int16_t)Kd_pitch_tmp + (int16_t)Kp_yaw_tmp + (int16_t)Ki_yaw_tmp + (int16_t)Kd_yaw_tmp;
+	int16_t	checksum_buffer =(((int16_t)spi_rx_data[spi_rx_data_index-3])<<8 | (int16_t)spi_rx_data[spi_rx_data_index-2]);
 
 	if (checksum_buffer == sum)
 	{
@@ -590,7 +613,6 @@ void getRCcommand(uint8_t spi_rx_data_index)
 		ch3 = throttle_tmp;
 		ch4 = yaw_tmp;
 		watchdog = 200;
-		
 	}
 }
  
@@ -678,5 +700,10 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
 void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin)
 { 
 	if (GPIO_Pin == GPIO_PIN_0) _Sampling_task_do = 1;
+}
+
+uint32_t milli(void)
+{
+	return HAL_GetTick();
 }
 #endif

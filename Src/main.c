@@ -121,9 +121,9 @@ int main(void)
 	HAL_NVIC_DisableIRQ(EXTI0_1_IRQn);
 //	init_mode_pin();
 	
-	HAL_Delay(200);
+	HAL_Delay(100);
 
-	if (HAL_GPIO_ReadPin(Pin_0_GPIO_Port, Pin_0_Pin) == GPIO_PIN_SET)  // go to "USB TO SERIAL" mode
+	if (HAL_GPIO_ReadPin(Pin_0_GPIO_Port, Pin_0_Pin) == GPIO_PIN_RESET)  // go to "USB TO SERIAL" mode
 	{
 		//MX_USART1_UART_Init();
 		MX_TIM17_Init();
@@ -158,26 +158,29 @@ int main(void)
 
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */
+	
+	uint32_t time_now = milli();
+	uint32_t watchdog_time_prev = time_now;
+	
+	
   while (1)
   {
   /* USER CODE END WHILE */
 
   /* USER CODE BEGIN 3 */
 				
-    if (watchdog > 0) watchdog --;
-		
-		if(watchdog == 0)		
+    if (time_now - watchdog_time_prev >= 10)
 		{
-			watchdog = 100 ;
-			HAL_GPIO_TogglePin(LED_R_GPIO_Port, LED_R_Pin);
-			
-			TIM2->CCR1 = 0 ;
-			TIM2->CCR2 = 0 ;
-			TIM3->CCR1 = 0 ;
-			TIM3->CCR2 = 0 ;
-		}  		
-
-		HAL_Delay(100);
+			watchdog_time_prev = time_now;
+			if (watchdog > 0) watchdog --;
+			if(watchdog == 0)		
+			{
+				TIM2->CCR1 = 0 ;
+				TIM2->CCR2 = 0 ;
+				TIM3->CCR1 = 0 ;
+				TIM3->CCR2 = 0 ;
+			}  		
+		}
   
 		if (_Sampling_task_do != 0)
 		{
@@ -494,7 +497,7 @@ static void MX_GPIO_Init(void)
   /*Configure GPIO pin : IMU_INT_Pin */
   GPIO_InitStruct.Pin = IMU_INT_Pin;
   GPIO_InitStruct.Mode = GPIO_MODE_IT_RISING;
-  GPIO_InitStruct.Pull = GPIO_PULLDOWN;
+  GPIO_InitStruct.Pull = GPIO_NOPULL;
   HAL_GPIO_Init(IMU_INT_GPIO_Port, &GPIO_InitStruct);
 
   /*Configure GPIO pin : LED_L_Pin */
