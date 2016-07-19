@@ -140,7 +140,29 @@ void stabilize_fn(void);
 
 void Sampling_task(void)
 {
-	
+	switch (Mode)
+		{
+			case calibation_mode :
+				calibation_fn();
+				break;
+			
+			case stabilize_mode :
+				stabilize_fn();				
+				break;
+			
+			case Function_1_mode :
+				Function1_call();
+				break;	
+			
+			case Function_2_mode :
+				Function2_call();
+				break;		
+
+			
+			default:
+				calibation_fn();
+				break;
+		}
 }
 
 void init_mode_pin()
@@ -587,7 +609,6 @@ void getRCcommand(uint8_t spi_rx_data_index)
 		ch3 = throttle_tmp;
 		ch4 = yaw_tmp;
 		watchdog = 200;
-		if (ch3 < 3 && calibation_pass) Mode = stabilize_mode;
 	}
 }
  
@@ -626,7 +647,7 @@ float abs_user(float x)
 
 void HAL_SPI_RxCpltCallback(SPI_HandleTypeDef *hspi)
 {
-	static uint8_t count;
+	static uint8_t count, command_code;
 	count++;
 	
 	if(count == 5)
@@ -636,16 +657,9 @@ void HAL_SPI_RxCpltCallback(SPI_HandleTypeDef *hspi)
 	}
 	
 	spi_rx_data_index = spi_rx_data_index + 1;	
-		
-	if (spi_rx_data_index >= 7)
-	{
-		/*----------------------------------RC COMMAND-----------------------------------*/
-		uint8_t command_code = 0xfd ;
-		if (spi_rx_data[spi_rx_data_index-2] == command_code && spi_rx_data[spi_rx_data_index-1] == command_code )
-		{
-			getRCcommand(spi_rx_data_index-3);
-			spi_rx_data_index = 0;
-		}
+	
+	if (spi_rx_data_index >= 2)
+	{		
 		/*----------------------------------FUNCTION-----------------------------------*/
 		command_code = 0xf1 ;
 		if (spi_rx_data[spi_rx_data_index-2] == command_code && spi_rx_data[spi_rx_data_index-1] == command_code )
@@ -662,17 +676,27 @@ void HAL_SPI_RxCpltCallback(SPI_HandleTypeDef *hspi)
 			Mode = Function_2_mode;
 			_function2_lock = 1;			
 		}		
-		
-		/*----------------------------------PID TUNING-----------------------------------*/
-
-		if(spi_rx_data_index >= 22)
+			
+		if (spi_rx_data_index >= 7)
 		{
-			command_code = 0xfe ;
-			if (spi_rx_data[spi_rx_data_index-2] == command_code && spi_rx_data[spi_rx_data_index-1] == command_code)
+			/*----------------------------------RC COMMAND-----------------------------------*/
+			command_code = 0xfd ;
+			if (spi_rx_data[spi_rx_data_index-2] == command_code && spi_rx_data[spi_rx_data_index-1] == command_code )
 			{
-				getPIDgain(spi_rx_data_index-1);
+				getRCcommand(spi_rx_data_index-3);
 				spi_rx_data_index = 0;
-			} 
+			}
+
+			if(spi_rx_data_index >= 22)
+			{
+				/*----------------------------------PID TUNING-----------------------------------*/
+				command_code = 0xfe ;
+				if (spi_rx_data[spi_rx_data_index-2] == command_code && spi_rx_data[spi_rx_data_index-1] == command_code)
+				{
+					getPIDgain(spi_rx_data_index-1);
+					spi_rx_data_index = 0;
+				} 
+			}
 		}
 	}
 	

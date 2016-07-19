@@ -542,18 +542,8 @@ uint8_t setPIDgain(void)
 
 void sentFunctioncommand(int8_t _FN)
 {
-  spi_transfer(0);
-  spi_transfer(0);
-  spi_transfer(0);
-  spi_transfer(0);
-  spi_transfer(0);
   spi_transfer(_FN);
   spi_transfer(_FN);
-  spi_transfer(0);
-  spi_transfer(0);
-  spi_transfer(0);
-  spi_transfer(0);
-  spi_transfer(0);
   spi_transfer(_FN);
   spi_transfer(_FN);
 }
@@ -664,7 +654,7 @@ uint8_t spi_transfer(uint8_t b)
     digitalWrite(_SCK, LOW);  // data will change at falling edge
   }
   spi_unselect();
-  delayMicroseconds(40);
+  delayMicroseconds(80);
   return 1;
 }
 

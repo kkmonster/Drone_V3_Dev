@@ -91,12 +91,23 @@ void HAL_TIM_MspPostInit(TIM_HandleTypeDef *htim);
 /* USER CODE BEGIN 0 */
 void Function1_call(void)
 {
-	static float flip_pitch, flip_roll;
+	if(_function2_lock == 1)
+	{
+		_function2_lock = 2;
+		
+	}
+	_function2_lock  = 0;
+	
+	if(_function2_lock == 0)Mode = stabilize_mode;
+}
+
+void Function2_call(void)
+{
+	static float flip_pitch;
 	
 	if(_function1_lock == 1) // initialize process
 	{
 		flip_pitch = 0;
-		flip_roll = 0;
 		_function1_lock = 4;
 		
 	}else if(_function1_lock == 2) { // prepare process
@@ -122,6 +133,7 @@ void Function1_call(void)
 		motor_C = 0;
 		motor_D = 0;
 		Drive_motor_output();	
+		
 		if (abs_user(flip_gx) > 275)
 		{
 			beta =  1.0f;		 // normal 0.2	
@@ -148,17 +160,7 @@ void Function1_call(void)
 	}else	if(_function1_lock == 0)Mode = stabilize_mode;   // GO TO stabilize_mode
 	
 }
-void Function2_call(void)
-{
-	if(_function2_lock == 1)
-	{
-		_function2_lock = 2;
-		
-	}
-	_function2_lock  = 0;
-	
-	if(_function2_lock == 0)Mode = stabilize_mode;
-}
+
 /* USER CODE END 0 */
 
 int main(void)
@@ -196,7 +198,7 @@ int main(void)
 	HAL_NVIC_DisableIRQ(EXTI0_1_IRQn);
 //	init_mode_pin();
 	
-	HAL_Delay(100);
+	HAL_Delay(300);
 
 	if (HAL_GPIO_ReadPin(Pin_0_GPIO_Port, Pin_0_Pin) == GPIO_PIN_RESET)  // go to "USB TO SERIAL" mode
 	{
@@ -259,32 +261,8 @@ int main(void)
 		if (_Sampling_task_do != 0)
 		{
 			_Sampling_task_do = 0;
-			
-			//*Sampling_task();
-			
-			switch (Mode)
-				{
-					case calibation_mode :
-						calibation_fn();
-						break;
-					
-					case stabilize_mode :
-						stabilize_fn();				
-						break;
-					
-					case Function_1_mode :
-						Function1_call();
-						break;	
-					
-					case Function_2_mode :
-						Function2_call();
-						break;		
+			Sampling_task();
 
-					
-					default:
-						calibation_fn();
-						break;
-				}
 		}
 	}
   /* USER CODE END 3 */
