@@ -32,6 +32,7 @@
 #include "arm_math.h" 
 #include "math.h" 
 #include "MPU6050.h"
+#include "usbd_cdc_if.h"
 
 extern I2C_HandleTypeDef hi2c1;
 extern SPI_HandleTypeDef hspi1;
@@ -43,6 +44,8 @@ extern TIM_HandleTypeDef htim17;
 
 extern UART_HandleTypeDef huart1;
 extern DMA_HandleTypeDef hdma_usart1_tx;
+
+volatile uint8_t _Sampling_task_do = 0;
 
 int16_t rawAccx_X = 1;
 int16_t rawAccx_Y = 1;
@@ -93,7 +96,7 @@ volatile uint8_t  spi_rx_data_index = 0;
 
 uint16_t watchdog  = 0;
 int16_t xxx = 0;
-int8_t calibation  = 0;
+int8_t _calibation  = 0;
 
 /* USER CODE for Receiver  */
 volatile uint8_t _index = 0 ;
@@ -125,7 +128,7 @@ void MPU6050_ReadBit(uint8_t slaveAddr, uint8_t regAddr, uint8_t bitNum, uint8_t
 void Read_MPU6050(void);
 void PID_controller(void);
 void Drive_motor_output(void);
-void Interrupt_call(void);
+void Sampling_task(void);
 void AHRS(void);
 float Smooth_filter(float alfa, float new_data, float prev_data);
 float invSqrt(float x) ;
@@ -137,7 +140,7 @@ void getRCcommand(uint8_t spi_rx_data_index);
 void readCommand (void);
 float abs_user(float x);
 
-void Interrupt_call(void)
+void Sampling_task(void)
 {
 	static int8_t ld_blink;
 	
@@ -151,10 +154,9 @@ void Interrupt_call(void)
 		/* Read data from sensor */
 		Read_MPU6050();
 
-
 	
 		/* Controller */
-	if(calibation == 0)
+	if(_calibation == 0)
 	{
 		
 		count++;
@@ -174,7 +176,7 @@ void Interrupt_call(void)
 		
 		if ((gx_x < deadband)&&(gy_x < deadband)&&(gz_x < deadband)&&(ax_x < deadband)&&(ay_x < deadband))
 		{
-			calibation = 1;
+			_calibation = 1;
 			gx_diff = gyx_d;
 			gy_diff = gyy_d;
 			gz_diff = gyz_d;
@@ -319,7 +321,7 @@ void Read_MPU6050(void)
 		{
 			beta =  2.0f;			
 		}
-		if (calibation == 0) 
+		if (_calibation == 0) 
 		{
 			gyx_d = Smooth_filter(0.005f, rawGyrox_X, gyx_d);
 			gyy_d = Smooth_filter(0.005f, rawGyrox_Y, gyy_d);	
@@ -668,9 +670,13 @@ void HAL_SPI_ErrorCallback(SPI_HandleTypeDef *hspi)
 	HAL_SPI_Receive_IT(&hspi1, (uint8_t*)(spi_rx_data+spi_rx_data_index), 1);
 }
 
-void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin)
+void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
 {
-	if (GPIO_Pin == GPIO_PIN_0) Interrupt_call();
+	if (htim == &htim17) Tim17_loop();                // USB to SERIAL Loopback
 }
 
+void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin)
+{ 
+	if (GPIO_Pin == GPIO_PIN_0) _Sampling_task_do = 1;
+}
 #endif

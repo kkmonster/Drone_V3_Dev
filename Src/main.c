@@ -37,7 +37,6 @@
 /* USER CODE BEGIN Includes */
 
 #include "bs_drone_lib.h"
-#include "usbd_cdc_if.h"
 
 /* USER CODE END Includes */
 
@@ -77,7 +76,6 @@ static void MX_NVIC_Init(void);
 
 void HAL_TIM_MspPostInit(TIM_HandleTypeDef *htim);
                 
-
 /* USER CODE BEGIN PFP */
 /* Private function prototypes -----------------------------------------------*/
 
@@ -125,7 +123,7 @@ int main(void)
 	
 	HAL_Delay(200);
 
-	if (HAL_GPIO_ReadPin(Pin_0_GPIO_Port, Pin_0_Pin) == GPIO_PIN_SET)
+	if (HAL_GPIO_ReadPin(Pin_0_GPIO_Port, Pin_0_Pin) == GPIO_PIN_SET)  // go to "USB TO SERIAL" mode
 	{
 		//MX_USART1_UART_Init();
 		MX_TIM17_Init();
@@ -142,18 +140,19 @@ int main(void)
 			LED_L_off();
 			LED_R_off();
 		}
+		
+	}else{  // go to "drone" mode
+	
+		HAL_TIM_PWM_Start(&htim2,TIM_CHANNEL_1);
+		HAL_TIM_PWM_Start(&htim2,TIM_CHANNEL_2);
+		HAL_TIM_PWM_Start(&htim3,TIM_CHANNEL_1);
+		HAL_TIM_PWM_Start(&htim3,TIM_CHANNEL_2);
+		
+		Initial_MPU6050();
+				
+		HAL_Delay(10);
+		HAL_NVIC_EnableIRQ(EXTI0_1_IRQn);
 	}
-	
-	HAL_TIM_PWM_Start(&htim2,TIM_CHANNEL_1);
-	HAL_TIM_PWM_Start(&htim2,TIM_CHANNEL_2);
-	HAL_TIM_PWM_Start(&htim3,TIM_CHANNEL_1);
-	HAL_TIM_PWM_Start(&htim3,TIM_CHANNEL_2);
-	
-	Initial_MPU6050();
-			
-  HAL_Delay(10);
-	HAL_NVIC_EnableIRQ(EXTI0_1_IRQn);
-	
 	
   /* USER CODE END 2 */
 
@@ -179,7 +178,13 @@ int main(void)
 		}  		
 
 		HAL_Delay(100);
-  }
+  
+		if (_Sampling_task_do != 0)
+		{
+			_Sampling_task_do = 0;
+			Sampling_task();
+		}
+	}
   /* USER CODE END 3 */
 
 }
@@ -285,7 +290,6 @@ static void MX_I2C1_Init(void)
 /* SPI1 init function */
 static void MX_SPI1_Init(void)
 {
-
   hspi1.Instance = SPI1;
   hspi1.Init.Mode = SPI_MODE_SLAVE;
   hspi1.Init.Direction = SPI_DIRECTION_2LINES;
@@ -303,7 +307,6 @@ static void MX_SPI1_Init(void)
   {
     Error_Handler();
   }
-
 }
 
 /* TIM2 init function */
@@ -430,7 +433,7 @@ static void MX_TIM17_Init(void)
   htim17.Instance = TIM17;
   htim17.Init.Prescaler = 479;
   htim17.Init.CounterMode = TIM_COUNTERMODE_UP;
-  htim17.Init.Period = 499;
+  htim17.Init.Period = 99;
   htim17.Init.ClockDivision = TIM_CLOCKDIVISION_DIV1;
   htim17.Init.RepetitionCounter = 0;
   if (HAL_TIM_Base_Init(&htim17) != HAL_OK)
@@ -527,10 +530,6 @@ static void MX_GPIO_Init(void)
 }
 
 /* USER CODE BEGIN 4 */
-void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
-{
-  if (htim == &htim17) Tim17_loop();				// USB to SERIAL Loopback
-}
 
 /* USER CODE END 4 */
 
