@@ -10,8 +10,6 @@
 #ifndef __BS_DRONE_LIB_H
 #define __BS_DRONE_LIB_H
 
-#define calibation_mode                  0    			    
-#define stabilize_mode                   1
 
 
 #define ACCELEROMETER_SENSITIVITY   8192.0f  
@@ -38,20 +36,9 @@
 #include "MPU6050.h"
 #include "usbd_cdc_if.h"
 
-extern I2C_HandleTypeDef hi2c1;
-extern SPI_HandleTypeDef hspi1;
-extern TIM_HandleTypeDef htim2;
-extern TIM_HandleTypeDef htim3;
-extern TIM_HandleTypeDef htim14;
-extern TIM_HandleTypeDef htim16;
-extern TIM_HandleTypeDef htim17;
-
-extern UART_HandleTypeDef huart1;
-extern DMA_HandleTypeDef hdma_usart1_tx;
-
 volatile uint8_t _Sampling_task_do = 0;
 
-uint8_t Mode = calibation_mode;
+volatile uint8_t Mode = calibation_mode;
 
 int16_t rawAccx_X = 1;
 int16_t rawAccx_Y = 1;
@@ -96,7 +83,7 @@ int16_t ax_diff = 0;
 int16_t ay_diff = 0;
 int16_t az_diff = 0;
 
-volatile uint8_t  spi_rx_buffer = 0;
+volatile uint8_t  calibation_pass = 0;
 volatile uint8_t  spi_rx_data[spi_buffer_size] = {0};
 volatile uint8_t  spi_rx_data_index = 0;
 
@@ -125,6 +112,9 @@ float _acx_d = INT16_MAX;
 float _acy_d = INT16_MAX;
 int16_t count;
 
+void Function1_call(void);
+void Function2_call(void);
+
 void Initial_MPU6050(void);
 void MPU6050_WriteBits(uint8_t slaveAddr, uint8_t regAddr, uint8_t bitStart, uint8_t length, uint8_t data);
 void MPU6050_WriteBit(uint8_t slaveAddr, uint8_t regAddr, uint8_t bitNum, uint8_t data);
@@ -150,28 +140,7 @@ void stabilize_fn(void);
 
 void Sampling_task(void)
 {
-
-
-	switch (Mode)
-    {
-    	case calibation_mode :
-			
-			calibation_fn();
-		
-    		break;
-    	case stabilize_mode :
-			stabilize_fn();
-		
-    		break;
-    	default:
-			calibation_fn();
-    		break;
-    }
-		/* Read data from sensor */
-		Read_MPU6050();
-
 	
-
 }
 
 void init_mode_pin()
@@ -189,7 +158,7 @@ void calibation_fn(void)
 {
 	Read_MPU6050();
 	count++;
-	if(count == 10)
+	if(count >= 10)
 	{
 		count = 0;
 		HAL_GPIO_TogglePin(LED_R_GPIO_Port, LED_R_Pin);
@@ -206,6 +175,7 @@ void calibation_fn(void)
 	if ((gx_x < deadband)&&(gy_x < deadband)&&(gz_x < deadband)&&(ax_x < deadband)&&(ay_x < deadband))
 	{
 		Mode = stabilize_mode;
+		calibation_pass = 1;
 		gx_diff = gyx_d;
 		gy_diff = gyy_d;
 		gz_diff = gyz_d;
@@ -227,14 +197,16 @@ void calibation_fn(void)
 void stabilize_fn(void)
 {
 	static int8_t ld_blink;
-
-	Read_MPU6050();
+	
 	ld_blink++;
-	if(ld_blink == 20)
+	if(ld_blink >= 20)
 	{
 		ld_blink = 0;
 		HAL_GPIO_TogglePin(LED_L_GPIO_Port, LED_L_Pin);
 	}
+	
+	Read_MPU6050();
+	
 	AHRS(); 
 	
 	PID_controller();
@@ -274,7 +246,7 @@ void Initial_MPU6050(void)
 	MPU6050_WriteBits(MPU6050_DEFAULT_ADDRESS, MPU6050_RA_GYRO_CONFIG, MPU6050_GCONFIG_FS_SEL_BIT, MPU6050_GCONFIG_FS_SEL_LENGTH, MPU6050_GYRO_FS_2000);
 	HAL_Delay(1);
 	
-	MPU6050_WriteBits(MPU6050_DEFAULT_ADDRESS, MPU6050_RA_CONFIG, MPU6050_CFG_DLPF_CFG_BIT, MPU6050_CFG_DLPF_CFG_LENGTH, MPU6050_DLPF_BW_42);
+	MPU6050_WriteBits(MPU6050_DEFAULT_ADDRESS, MPU6050_RA_CONFIG, MPU6050_CFG_DLPF_CFG_BIT, MPU6050_CFG_DLPF_CFG_LENGTH, MPU6050_DLPF_BW_98);
 	HAL_Delay(1);
 			
 	MPU6050_WriteBits(MPU6050_DEFAULT_ADDRESS, MPU6050_RA_SMPLRT_DIV, 7, 8, 3);
@@ -350,14 +322,14 @@ void Read_MPU6050(void)
 		beta =  2.0f;			
 	}
 	
-	if (Mode == stabilize_mode) 
+	if (Mode == calibation_mode) 
 	{
 		gyx_d = Smooth_filter(0.005f, rawGyrox_X, gyx_d);
 		gyy_d = Smooth_filter(0.005f, rawGyrox_Y, gyy_d);	
 		gyz_d = Smooth_filter(0.005f, rawGyrox_Z, gyz_d);
 		acx_d = Smooth_filter(0.005f, rawAccx_X, acx_d);
 		acy_d = Smooth_filter(0.005f, rawAccx_Y, acy_d);	
-		f = Smooth_filter(0.001f, rawAccx_Z, f);		
+		//f     = Smooth_filter(0.005f, rawAccx_Z, f);		
 	}
 	
 	rawGyrox_X -= gx_diff;
@@ -380,12 +352,12 @@ void PID_controller(void)
 	static float cal_pitch ;
 	static float cal_roll  ;
 		
-	cal_pitch = Smooth_filter(0.7f, q_pitch*0.1f, cal_pitch);
-	cal_roll = Smooth_filter(0.7f, q_roll*0.1f, cal_roll);
+	cal_pitch = Smooth_filter(0.9f, q_pitch*0.1f, cal_pitch);
+	cal_roll = Smooth_filter(0.9f, q_roll*0.1f, cal_roll);
 	
 	T_center_buffer    = (float)ch3 *   20.0f;
 	
-	T_center = Smooth_filter(0.35f, T_center_buffer, T_center);
+	T_center = Smooth_filter(0.6f, T_center_buffer, T_center);
 
 	Error_yaw 	=  -(float)ch4 * 3.0f - ((float)rawGyrox_Z)/GYROSCOPE_SENSITIVITY;
 	Errer_pitch =  -(float)ch2 * 0.3f - ((float)cal_pitch)	;
@@ -443,9 +415,9 @@ void Drive_motor_output(void)
 	TIM3->CCR2 = constrain(motor_B, 0, 2399);
 }
 
-void AHRS()
+void AHRS(void)
 {
-	float dt = 0.004f; 
+	static float dt = 0.004f; 	
 	float gx = (((float)rawGyrox_X)/GYROSCOPE_SENSITIVITY)*(M_PIf/180.0f);
 	float gy = (((float)rawGyrox_Y)/GYROSCOPE_SENSITIVITY)*(M_PIf/180.0f);
 	float gz = (((float)rawGyrox_Z)/GYROSCOPE_SENSITIVITY)*(M_PIf/180.0f);
@@ -453,14 +425,15 @@ void AHRS()
 	float ay = ((float)rawAccx_Y)/ACCELEROMETER_SENSITIVITY;
 	float az = ((float)rawAccx_Z)/ACCELEROMETER_SENSITIVITY;
 
-	static uint8_t useAcc = 1;
+
     float recipNorm;
     float ex = 0, ey = 0, ez = 0;
     float qa, qb, qc;
 
     // Use measured acceleration vector
     recipNorm = sq(ax) + sq(ay) + sq(az);
-    if (useAcc && (recipNorm > 0.01f)) {
+    if (recipNorm > 0.01f) 
+		{
         // Normalise accelerometer measurement
         recipNorm = invSqrt(recipNorm);
         ax *= recipNorm;
@@ -471,6 +444,7 @@ void AHRS()
         ex += (ay * rMat[2][2] - az * rMat[2][1]);
         ey += (az * rMat[2][0] - ax * rMat[2][2]);
         ez += (ax * rMat[2][1] - ay * rMat[2][0]);
+
     }
 
     // Apply proportional and integral feedback
@@ -613,6 +587,7 @@ void getRCcommand(uint8_t spi_rx_data_index)
 		ch3 = throttle_tmp;
 		ch4 = yaw_tmp;
 		watchdog = 200;
+		if (ch3 < 3 && calibation_pass) Mode = stabilize_mode;
 	}
 }
  
@@ -664,17 +639,36 @@ void HAL_SPI_RxCpltCallback(SPI_HandleTypeDef *hspi)
 		
 	if (spi_rx_data_index >= 7)
 	{
+		/*----------------------------------RC COMMAND-----------------------------------*/
 		uint8_t command_code = 0xfd ;
 		if (spi_rx_data[spi_rx_data_index-2] == command_code && spi_rx_data[spi_rx_data_index-1] == command_code )
 		{
 			getRCcommand(spi_rx_data_index-3);
 			spi_rx_data_index = 0;
 		}
+		/*----------------------------------FUNCTION-----------------------------------*/
+		command_code = 0xf1 ;
+		if (spi_rx_data[spi_rx_data_index-2] == command_code && spi_rx_data[spi_rx_data_index-1] == command_code )
+		{
+			spi_rx_data_index = 0;
+			Mode = Function_1_mode;
+			_function1_lock = 1;
+		}
 		
-		uint8_t command_code2 = 0xfe ;
+		command_code = 0xf2 ;
+		if (spi_rx_data[spi_rx_data_index-2] == command_code && spi_rx_data[spi_rx_data_index-1] == command_code )
+		{
+			spi_rx_data_index = 0;
+			Mode = Function_2_mode;
+			_function2_lock = 1;			
+		}		
+		
+		/*----------------------------------PID TUNING-----------------------------------*/
+
 		if(spi_rx_data_index >= 22)
 		{
-			if (spi_rx_data[spi_rx_data_index-2] == command_code2 && spi_rx_data[spi_rx_data_index-1] == command_code2)
+			command_code = 0xfe ;
+			if (spi_rx_data[spi_rx_data_index-2] == command_code && spi_rx_data[spi_rx_data_index-1] == command_code)
 			{
 				getPIDgain(spi_rx_data_index-1);
 				spi_rx_data_index = 0;

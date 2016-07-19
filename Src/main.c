@@ -35,8 +35,11 @@
 #include "usb_device.h"
 
 /* USER CODE BEGIN Includes */
+#define calibation_mode           0    			    
+#define stabilize_mode           	1
+#define Function_1_mode           2    			    
+#define Function_2_mode           3
 
-#include "bs_drone_lib.h"
 
 /* USER CODE END Includes */
 
@@ -56,7 +59,10 @@ DMA_HandleTypeDef hdma_usart1_tx;
 
 /* USER CODE BEGIN PV */
 /* Private variables ---------------------------------------------------------*/
+uint8_t _function1_lock = 0;
+uint8_t _function2_lock = 0;
 
+#include "bs_drone_lib.h"
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -83,7 +89,76 @@ void HAL_TIM_MspPostInit(TIM_HandleTypeDef *htim);
 /* USER CODE END PFP */
 
 /* USER CODE BEGIN 0 */
+void Function1_call(void)
+{
+	static float flip_pitch, flip_roll;
+	
+	if(_function1_lock == 1) // initialize process
+	{
+		flip_pitch = 0;
+		flip_roll = 0;
+		_function1_lock = 4;
+		
+	}else if(_function1_lock == 2) { // prepare process
+		
+		ch1 = 0;
+		ch2 = 0;
+		stabilize_fn();					
+		if (abs_user(q_pitch) < 2 && abs_user(q_roll < 2)) _function1_lock = 3;
+		
+	}else if(_function1_lock == 3) { // jump process
 
+		
+		_function1_lock = 4;
+		
+	}else if(_function1_lock == 4) { // flip process
+		
+		Read_MPU6050();
+		float flip_gx = (((float)rawGyrox_X)/GYROSCOPE_SENSITIVITY)*(M_PIf/180.0f);
+		flip_pitch += flip_gx * 0.004f;
+
+		motor_A = 300;
+		motor_B = 300;
+		motor_C = 0;
+		motor_D = 0;
+		Drive_motor_output();	
+		if (abs_user(flip_gx) > 275)
+		{
+			beta =  1.0f;		 // normal 0.2	
+			
+			motor_A = 0;
+			motor_B = 0;
+			motor_C = 0;
+			motor_D = 0;
+			Drive_motor_output();
+			
+			if (abs_user(flip_gx) > 330)
+			{
+				beta =  0.5f;		 // normal 0.2		
+				
+				if (abs_user(flip_gx) > 350)   // flip finish 
+				{
+					_function1_lock = 0;
+				}
+			}
+			AHRS();
+
+		}
+		
+	}else	if(_function1_lock == 0)Mode = stabilize_mode;   // GO TO stabilize_mode
+	
+}
+void Function2_call(void)
+{
+	if(_function2_lock == 1)
+	{
+		_function2_lock = 2;
+		
+	}
+	_function2_lock  = 0;
+	
+	if(_function2_lock == 0)Mode = stabilize_mode;
+}
 /* USER CODE END 0 */
 
 int main(void)
@@ -162,7 +237,6 @@ int main(void)
 	uint32_t time_now = milli();
 	uint32_t watchdog_time_prev = time_now;
 	
-	
   while (1)
   {
   /* USER CODE END WHILE */
@@ -185,7 +259,32 @@ int main(void)
 		if (_Sampling_task_do != 0)
 		{
 			_Sampling_task_do = 0;
-			Sampling_task();
+			
+			//*Sampling_task();
+			
+			switch (Mode)
+				{
+					case calibation_mode :
+						calibation_fn();
+						break;
+					
+					case stabilize_mode :
+						stabilize_fn();				
+						break;
+					
+					case Function_1_mode :
+						Function1_call();
+						break;	
+					
+					case Function_2_mode :
+						Function2_call();
+						break;		
+
+					
+					default:
+						calibation_fn();
+						break;
+				}
 		}
 	}
   /* USER CODE END 3 */
