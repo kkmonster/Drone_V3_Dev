@@ -101,7 +101,7 @@ void Function1_call(void)
 	if(_function2_lock == 0)Mode = stabilize_mode;
 }
 
-volatile static float flip_pitch, flip_speed = 2200, flip_cutpower = 330, flip_stop = 355;
+volatile static float flip_pitch, flip_speed = 2200, flip_cutpower = 180, flip_Active_ahrs = 357, flip_stop = 358;
 void Function2_call(void)
 {
 //	static float flip_pitch, flip_speed, flip_cutpower, flip_stop;
@@ -143,15 +143,15 @@ void Function2_call(void)
 			
 			motor_A = 0;
 			motor_B = 0;
-			motor_C = 0;
-			motor_D = 0;
+			motor_C = flip_speed;
+			motor_D = flip_speed;
 			Drive_motor_output();
 			
-			if (abs_user(flip_pitch) > flip_stop)
+			if (abs_user(flip_pitch) > flip_Active_ahrs)
 			{
 				beta =  2.5f;		 // normal 0.2		
 				AHRS();
-				if (abs_user(flip_pitch) >= 360)	_function2_lock = 0;   // flip finish 
+				if (abs_user(flip_pitch) >= flip_stop)	_function2_lock = 0;   // flip finish 
 
 			}
 
