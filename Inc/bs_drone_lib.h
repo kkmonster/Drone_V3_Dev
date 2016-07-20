@@ -374,8 +374,8 @@ void PID_controller(void)
 	static float cal_pitch ;
 	static float cal_roll  ;
 		
-	cal_pitch = Smooth_filter(0.9f, q_pitch*0.1f, cal_pitch);
-	cal_roll = Smooth_filter(0.9f, q_roll*0.1f, cal_roll);
+	cal_pitch = Smooth_filter(0.9f, (float)q_pitch*0.1f, cal_pitch);
+	cal_roll = Smooth_filter(0.9f, (float)q_roll*0.1f, cal_roll);
 	
 	T_center_buffer    = (float)ch3 *   20.0f;
 	

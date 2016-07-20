@@ -62,6 +62,8 @@ DMA_HandleTypeDef hdma_usart1_tx;
 uint8_t _function1_lock = 0;
 uint8_t _function2_lock = 0;
 
+void flip_PD_controller(void);
+
 #include "bs_drone_lib.h"
 /* USER CODE END PV */
 
@@ -101,7 +103,7 @@ void Function1_call(void)
 	if(_function2_lock == 0)Mode = stabilize_mode;
 }
 
-volatile static float flip_pitch, flip_speed = 2200, flip_cutpower = 180, flip_Active_ahrs = 357, flip_stop = 358;
+volatile static float angle_target, flip_yaw, flip_pitch, flip_roll, flip_speed = 2000, flip_cutpower = 180, flip_Active_ahrs = 358, flip_stop = 355;
 void Function2_call(void)
 {
 //	static float flip_pitch, flip_speed, flip_cutpower, flip_stop;
@@ -109,7 +111,11 @@ void Function2_call(void)
 	
 	if(_function2_lock == 1) // initialize process
 	{
+		flip_yaw = 0;
 		flip_pitch = 0;
+		flip_roll = 0;
+		angle_target = 0;
+		
 		_function2_lock = 4;
 		
 	}else if(_function2_lock == 2) { // prepare process
@@ -117,7 +123,7 @@ void Function2_call(void)
 		ch1 = 0;
 		ch2 = 0;
 		stabilize_fn();					
-		if (abs_user(q_pitch) < 2 && abs_user(q_roll < 2)) _function2_lock = 3;
+		if (abs_user(q_pitch) < 15 && abs_user(q_roll) < 15) _function2_lock = 4;
 		
 	}else if(_function2_lock == 3) { // jump process
 
@@ -127,39 +133,153 @@ void Function2_call(void)
 	}else if(_function2_lock == 4) { // flip process
 
 		
-		Read_MPU6050();
-		float flip_gx = (((float)rawGyrox_X)/GYROSCOPE_SENSITIVITY);
-		flip_pitch += flip_gx * 0.004f;
-
-		motor_A = flip_speed;
-		motor_B = flip_speed;
-		motor_C = 0;
-		motor_D = 0;
-		Drive_motor_output();	
+		if(abs_user(angle_target) < 360) angle_target += 0.7f;
 		
-		if (abs_user(flip_pitch) > flip_cutpower)
-		{
-//			beta =  1.0f;		 // normal 0.2	
-			
-			motor_A = 0;
-			motor_B = 0;
-			motor_C = flip_speed;
-			motor_D = flip_speed;
-			Drive_motor_output();
-			
-			if (abs_user(flip_pitch) > flip_Active_ahrs)
-			{
-				beta =  2.5f;		 // normal 0.2		
-				AHRS();
-				if (abs_user(flip_pitch) >= flip_stop)	_function2_lock = 0;   // flip finish 
-
-			}
-
-
-		}
+		if(abs_user(flip_pitch) >= flip_stop)	_function2_lock = 0;   // flip finish 
 		
+	static float cal_pitch ;
+	static float cal_roll  ;
+
+	Read_MPU6050();	
+	
+	float flip_gx = (((float)rawGyrox_X)/GYROSCOPE_SENSITIVITY);
+	float flip_gy = (((float)rawGyrox_Y)/GYROSCOPE_SENSITIVITY);
+
+	flip_pitch -= flip_gx * 0.004f;
+	flip_roll  -=	flip_gy * 0.004f;
+	
+	float Buf_D_Error_yaw   =Error_yaw;
+	float Buf_D_Errer_pitch =Errer_pitch;
+	float Buf_D_Error_roll  =Error_roll; 
+     
+//	cal_pitch = Smooth_filter(0.95f, flip_pitch, cal_pitch);
+//	cal_roll  = Smooth_filter(0.95f, flip_roll, cal_roll);
+	
+	cal_pitch = flip_pitch;
+	cal_roll  = flip_roll;
+	
+//	T_center_buffer    = (float)ch3 *   20.0f;
+
+	T_center = flip_speed;
+//	T_center = Smooth_filter(0.6f, T_center_buffer, T_center);
+	
+	Error_yaw 	=    0 - ((float)rawGyrox_Z)/GYROSCOPE_SENSITIVITY;
+//	Errer_pitch =  angle_target - ((float)cal_pitch)	;
+	Error_roll 	=    0 + ((float)cal_roll)	;
+
+
+	D_Error_yaw =  (Error_yaw-Buf_D_Error_yaw)    *sampleFreq ;
+//	D_Error_pitch =(Errer_pitch-Buf_D_Errer_pitch)*sampleFreq;
+	D_Error_roll = (Error_roll-Buf_D_Error_roll)  *sampleFreq;
+
+	Del_yaw		= constrain((Kp_yaw   * Error_yaw), -2300, 2300);   + constrain((Kd_yaw   * D_Error_yaw),   -1500, 1500);
+//	Del_pitch	= constrain((Kp_pitch * Errer_pitch), -2300, 2300); + constrain((Kd_pitch * D_Error_pitch), -1500, 1500);
+	Del_roll	= constrain((Kp_roll  * Error_roll), -2300, 2300);  + constrain((Kd_roll  * D_Error_roll),  -1500, 1500);
+	
+	Del_pitch = 0;
+
+	if(abs_user(flip_pitch) >= flip_stop*0.5f)
+	{
+		motor_A =  T_center+Del_pitch	+Del_roll -Del_yaw;
+		motor_B =  T_center+Del_pitch	-Del_roll +Del_yaw;
+		motor_C =  -Del_pitch	-Del_roll -Del_yaw;
+		motor_D =  -Del_pitch	+Del_roll +Del_yaw;	
+	}else{
+		motor_A =  +Del_pitch	+Del_roll -Del_yaw;
+		motor_B =  +Del_pitch	-Del_roll +Del_yaw;
+		motor_C =  T_center-Del_pitch	-Del_roll -Del_yaw;
+		motor_D =  T_center-Del_pitch	+Del_roll +Del_yaw;	
+	}
+	Drive_motor_output();	
+		
+		
+		
+		
+	//-----------------------------------------------------------------------------------------------------------//	
+//		Read_MPU6050();
+//		float flip_gx = (((float)rawGyrox_X)/GYROSCOPE_SENSITIVITY);
+//	  float flip_gy = (((float)rawGyrox_Y)/GYROSCOPE_SENSITIVITY);
+//	  float flip_gz = (((float)rawGyrox_Z)/GYROSCOPE_SENSITIVITY);
+//		
+//		
+//		flip_pitch += flip_gx * 0.004f;
+//		
+//		
+//		motor_A = flip_speed;
+//		motor_B = flip_speed;
+//		motor_C = 0;
+//		motor_D = 0;
+//		Drive_motor_output();	
+//		
+//		if (abs_user(flip_pitch) > flip_cutpower)
+//		{
+//			
+//			motor_A = 0;
+//			motor_B = 0;
+//			motor_C = flip_speed;
+//			motor_D = flip_speed;
+//			Drive_motor_output();
+//			
+//			if (abs_user(flip_pitch) > flip_Active_ahrs)
+//			{
+//				beta =  2.0f;		 // normal 0.2		
+//				AHRS();
+//			}
+//		}
+		
+
 	}else	if(_function2_lock == 0) Mode = stabilize_mode;   // GO TO stabilize_mode
 	
+}
+
+void flip_PD_controller(void)
+{
+	static float cal_pitch ;
+	static float cal_roll  ;
+
+	Read_MPU6050();	
+	
+	float flip_gx = (((float)rawGyrox_X)/GYROSCOPE_SENSITIVITY);
+	float flip_gy = (((float)rawGyrox_Y)/GYROSCOPE_SENSITIVITY);
+
+	flip_pitch -= flip_gx * 0.004f;
+	flip_roll  -=	flip_gy * 0.004f;
+	
+	float Buf_D_Error_yaw   =Error_yaw;
+	float Buf_D_Errer_pitch =Errer_pitch;
+	float Buf_D_Error_roll  =Error_roll; 
+     
+//	cal_pitch = Smooth_filter(0.95f, flip_pitch, cal_pitch);
+//	cal_roll  = Smooth_filter(0.95f, flip_roll, cal_roll);
+	
+	cal_pitch = flip_pitch;
+	cal_roll  = flip_roll;
+	
+//	T_center_buffer    = (float)ch3 *   20.0f;
+
+//	//  T_center = flip_speed;
+//	T_center = Smooth_filter(0.6f, T_center_buffer, T_center);
+	
+	Error_yaw 	=    0 - ((float)rawGyrox_Z)/GYROSCOPE_SENSITIVITY;
+	Errer_pitch =  angle_target - ((float)cal_pitch)	;
+	Error_roll 	=    0 + ((float)cal_roll)	;
+
+
+	D_Error_yaw =  (Error_yaw-Buf_D_Error_yaw)    *sampleFreq ;
+	D_Error_pitch =(Errer_pitch-Buf_D_Errer_pitch)*sampleFreq;
+	D_Error_roll = (Error_roll-Buf_D_Error_roll)  *sampleFreq;
+
+	Del_yaw		= constrain((Kp_yaw   * Error_yaw), -2300, 2300);   + constrain((Kd_yaw   * D_Error_yaw),   -1500, 1500);
+	Del_pitch	= constrain((Kp_pitch * Errer_pitch), -2300, 2300); + constrain((Kd_pitch * D_Error_pitch), -1500, 1500);
+	Del_roll	= constrain((Kp_roll  * Error_roll), -2300, 2300);  + constrain((Kd_roll  * D_Error_roll),  -1500, 1500);
+	
+	
+	motor_A =  +Del_pitch	+Del_roll -Del_yaw;
+	motor_B =  +Del_pitch	-Del_roll +Del_yaw;
+	motor_C =  -Del_pitch	-Del_roll -Del_yaw;
+	motor_D =  -Del_pitch	+Del_roll +Del_yaw;	
+	
+	Drive_motor_output();	
 }
 
 /* USER CODE END 0 */
