@@ -203,13 +203,14 @@ int main(void)
 	if (HAL_GPIO_ReadPin(Pin_0_GPIO_Port, Pin_0_Pin) == GPIO_PIN_RESET)  // go to "USB TO SERIAL" mode
 	{
 		//MX_USART1_UART_Init();
+		
+		MX_USB_DEVICE_Init();
+		
 		MX_TIM17_Init();
 		HAL_NVIC_SetPriority(TIM17_IRQn, 2, 0);
 		HAL_NVIC_EnableIRQ(TIM17_IRQn);
 		
 		HAL_TIM_Base_Start_IT(&htim17);
-		
-		MX_USB_DEVICE_Init();
 		
 		while (1)
 		{
