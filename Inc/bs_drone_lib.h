@@ -430,11 +430,27 @@ void Drive_motor_output(void)
 	//motor_B = 100 ;
 	//motor_C = 100 ;
 	//motor_D = 100 ;
-		
-	TIM2->CCR1 = constrain(motor_C, 0, 2399);
-	TIM2->CCR2 = constrain(motor_D, 0, 2399);
-	TIM3->CCR1 = constrain(motor_A, 0, 2399);
-	TIM3->CCR2 = constrain(motor_B, 0, 2399);
+	
+	// limmit output max, min
+	if(motor_A < 0) motor_A = 0 ;
+	if(motor_B < 0) motor_B = 0 ;
+	if(motor_C < 0) motor_C = 0 ;
+	if(motor_D < 0) motor_D = 0 ;
+	
+	if(motor_A > 2399) motor_A = 2399 ;
+	if(motor_B > 2399) motor_B = 2399 ;
+	if(motor_C > 2399) motor_C = 2399 ;
+	if(motor_D > 2399) motor_D = 2399 ;
+	
+	TIM2->CCR1 = motor_C ;
+	TIM2->CCR2 = motor_D ;
+	TIM3->CCR1 = motor_A ;
+	TIM3->CCR2 = motor_B ;
+
+//	TIM2->CCR1 = constrain(motor_C, 0, 2399);
+//	TIM2->CCR2 = constrain(motor_D, 0, 2399);
+//	TIM3->CCR1 = constrain(motor_A, 0, 2399);
+//	TIM3->CCR2 = constrain(motor_B, 0, 2399);
 }
 
 void AHRS(void)
@@ -661,21 +677,21 @@ void HAL_SPI_RxCpltCallback(SPI_HandleTypeDef *hspi)
 	if (spi_rx_data_index >= 2)
 	{		
 		/*----------------------------------FUNCTION-----------------------------------*/
-		command_code = 0xf1 ;
-		if (spi_rx_data[spi_rx_data_index-2] == command_code && spi_rx_data[spi_rx_data_index-1] == command_code )
-		{
-			spi_rx_data_index = 0;
-			Mode = Function_1_mode;
-			_function1_lock = 1;
-		}
-		
-		command_code = 0xf2 ;
-		if (spi_rx_data[spi_rx_data_index-2] == command_code && spi_rx_data[spi_rx_data_index-1] == command_code )
-		{
-			spi_rx_data_index = 0;
-			Mode = Function_2_mode;
-			_function2_lock = 1;			
-		}		
+//		command_code = 0xf1 ;
+//		if (spi_rx_data[spi_rx_data_index-2] == command_code && spi_rx_data[spi_rx_data_index-1] == command_code )
+//		{
+//			spi_rx_data_index = 0;
+//			Mode = Function_1_mode;
+//			_function1_lock = 1;
+//		}
+//		
+//		command_code = 0xf2 ;
+//		if (spi_rx_data[spi_rx_data_index-2] == command_code && spi_rx_data[spi_rx_data_index-1] == command_code )
+//		{
+//			spi_rx_data_index = 0;
+//			Mode = Function_2_mode;
+//			_function2_lock = 1;			
+//		}		
 			
 		if (spi_rx_data_index >= 7)
 		{

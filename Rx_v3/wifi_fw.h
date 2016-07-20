@@ -654,7 +654,7 @@ uint8_t spi_transfer(uint8_t b)
     digitalWrite(_SCK, LOW);  // data will change at falling edge
   }
   spi_unselect();
-  delayMicroseconds(80);
+  delayMicroseconds(50);
   return 1;
 }
 
