@@ -91,52 +91,55 @@ void HAL_TIM_MspPostInit(TIM_HandleTypeDef *htim);
 /* USER CODE BEGIN 0 */
 void Function1_call(void)
 {
-	if(_function2_lock == 1)
+	if(_function1_lock == 1)
 	{
-		_function2_lock = 2;
+		_function1_lock = 2;
 		
 	}
-	_function2_lock  = 0;
+	_function1_lock  = 0;
 	
 	if(_function2_lock == 0)Mode = stabilize_mode;
 }
 
+volatile static float flip_pitch, flip_speed = 2200, flip_cutpower = 330, flip_stop = 355;
 void Function2_call(void)
 {
-	static float flip_pitch;
+//	static float flip_pitch, flip_speed, flip_cutpower, flip_stop;
+
 	
-	if(_function1_lock == 1) // initialize process
+	if(_function2_lock == 1) // initialize process
 	{
 		flip_pitch = 0;
-		_function1_lock = 4;
+		_function2_lock = 4;
 		
-	}else if(_function1_lock == 2) { // prepare process
+	}else if(_function2_lock == 2) { // prepare process
 		
 		ch1 = 0;
 		ch2 = 0;
 		stabilize_fn();					
-		if (abs_user(q_pitch) < 2 && abs_user(q_roll < 2)) _function1_lock = 3;
+		if (abs_user(q_pitch) < 2 && abs_user(q_roll < 2)) _function2_lock = 3;
 		
-	}else if(_function1_lock == 3) { // jump process
+	}else if(_function2_lock == 3) { // jump process
 
 		
-		_function1_lock = 4;
+		_function2_lock = 4;
 		
-	}else if(_function1_lock == 4) { // flip process
+	}else if(_function2_lock == 4) { // flip process
+
 		
 		Read_MPU6050();
-		float flip_gx = (((float)rawGyrox_X)/GYROSCOPE_SENSITIVITY)*(M_PIf/180.0f);
+		float flip_gx = (((float)rawGyrox_X)/GYROSCOPE_SENSITIVITY);
 		flip_pitch += flip_gx * 0.004f;
 
-		motor_A = 300;
-		motor_B = 300;
+		motor_A = flip_speed;
+		motor_B = flip_speed;
 		motor_C = 0;
 		motor_D = 0;
 		Drive_motor_output();	
 		
-		if (abs_user(flip_gx) > 275)
+		if (abs_user(flip_pitch) > flip_cutpower)
 		{
-			beta =  1.0f;		 // normal 0.2	
+//			beta =  1.0f;		 // normal 0.2	
 			
 			motor_A = 0;
 			motor_B = 0;
@@ -144,20 +147,18 @@ void Function2_call(void)
 			motor_D = 0;
 			Drive_motor_output();
 			
-			if (abs_user(flip_gx) > 330)
+			if (abs_user(flip_pitch) > flip_stop)
 			{
-				beta =  0.5f;		 // normal 0.2		
-				
-				if (abs_user(flip_gx) > 350)   // flip finish 
-				{
-					_function1_lock = 0;
-				}
+				beta =  2.5f;		 // normal 0.2		
+				AHRS();
+				if (abs_user(flip_pitch) >= 360)	_function2_lock = 0;   // flip finish 
+
 			}
-			AHRS();
+
 
 		}
 		
-	}else	if(_function1_lock == 0)Mode = stabilize_mode;   // GO TO stabilize_mode
+	}else	if(_function2_lock == 0) Mode = stabilize_mode;   // GO TO stabilize_mode
 	
 }
 
@@ -245,7 +246,9 @@ int main(void)
   /* USER CODE END WHILE */
 
   /* USER CODE BEGIN 3 */
-				
+		
+		time_now = milli();
+		
     if (time_now - watchdog_time_prev >= 10)
 		{
 			watchdog_time_prev = time_now;

@@ -625,6 +625,7 @@ void getRCcommand(uint8_t spi_rx_data_index)
 		ch3 = throttle_tmp;
 		ch4 = yaw_tmp;
 		watchdog = 200;
+		if(ch3 < 3 && calibation_pass == 1) Mode = stabilize_mode;
 	}
 }
  
@@ -677,21 +678,21 @@ void HAL_SPI_RxCpltCallback(SPI_HandleTypeDef *hspi)
 	if (spi_rx_data_index >= 2)
 	{		
 		/*----------------------------------FUNCTION-----------------------------------*/
-//		command_code = 0xf1 ;
-//		if (spi_rx_data[spi_rx_data_index-2] == command_code && spi_rx_data[spi_rx_data_index-1] == command_code )
-//		{
-//			spi_rx_data_index = 0;
-//			Mode = Function_1_mode;
-//			_function1_lock = 1;
-//		}
-//		
-//		command_code = 0xf2 ;
-//		if (spi_rx_data[spi_rx_data_index-2] == command_code && spi_rx_data[spi_rx_data_index-1] == command_code )
-//		{
-//			spi_rx_data_index = 0;
-//			Mode = Function_2_mode;
-//			_function2_lock = 1;			
-//		}		
+		command_code = 0xf1 ;
+		if (spi_rx_data[spi_rx_data_index-2] == command_code && spi_rx_data[spi_rx_data_index-1] == command_code )
+		{
+			spi_rx_data_index = 0;
+			Mode = Function_1_mode;
+			_function1_lock = 1;
+		}
+		
+		command_code = 0xf2 ;
+		if (spi_rx_data[spi_rx_data_index-2] == command_code && spi_rx_data[spi_rx_data_index-1] == command_code )
+		{
+			spi_rx_data_index = 0;
+			Mode = Function_2_mode;
+			_function2_lock = 1;			
+		}		
 			
 		if (spi_rx_data_index >= 7)
 		{
