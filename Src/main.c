@@ -398,7 +398,7 @@ static void MX_TIM2_Init(void)
   TIM_OC_InitTypeDef sConfigOC;
 
   htim2.Instance = TIM2;
-  htim2.Init.Prescaler = 0;
+  htim2.Init.Prescaler = 1;
   htim2.Init.CounterMode = TIM_COUNTERMODE_UP;
   htim2.Init.Period = 2399;
   htim2.Init.ClockDivision = TIM_CLOCKDIVISION_DIV1;
@@ -440,7 +440,7 @@ static void MX_TIM3_Init(void)
   TIM_OC_InitTypeDef sConfigOC;
 
   htim3.Instance = TIM3;
-  htim3.Init.Prescaler = 0;
+  htim3.Init.Prescaler = 1;
   htim3.Init.CounterMode = TIM_COUNTERMODE_UP;
   htim3.Init.Period = 2399;
   htim3.Init.ClockDivision = TIM_CLOCKDIVISION_DIV1;
@@ -587,7 +587,8 @@ static void MX_GPIO_Init(void)
 
   /*Configure GPIO pin : Pin_0_Pin */
   GPIO_InitStruct.Pin = Pin_0_Pin;
-  GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_OD;
+//  GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_OD;
+  GPIO_InitStruct.Mode = GPIO_MODE_INPUT;
   GPIO_InitStruct.Pull = GPIO_PULLUP;
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
   HAL_GPIO_Init(Pin_0_GPIO_Port, &GPIO_InitStruct);
@@ -603,7 +604,7 @@ static void MX_GPIO_Init(void)
   HAL_GPIO_WritePin(LED_L_GPIO_Port, LED_L_Pin, GPIO_PIN_RESET);
 
   /*Configure GPIO pin Output Level */
-  HAL_GPIO_WritePin(Pin_0_GPIO_Port, Pin_0_Pin, GPIO_PIN_SET);
+//  HAL_GPIO_WritePin(Pin_0_GPIO_Port, Pin_0_Pin, GPIO_PIN_SET);
 
   /*Configure GPIO pin Output Level */
   HAL_GPIO_WritePin(LED_R_GPIO_Port, LED_R_Pin, GPIO_PIN_RESET);
