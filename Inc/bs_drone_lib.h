@@ -18,8 +18,10 @@
 #define M_PIf       								3.14159265358979323846f
 #define M_PI                        M_PIf    
 #define sampleFreq                  250.0f     			    // 200 hz sample rate!   
-#define limmit_I                    300.0f     
+#define limmit_I                    300.0f    
 
+#define acc_compensation 0.3f
+#define acc_compensation_ground 2.0f
 #define spi_buffer_size 96
 
 #define LED_R_on()  HAL_GPIO_WritePin(LED_R_GPIO_Port, LED_R_Pin, GPIO_PIN_SET)
@@ -337,11 +339,11 @@ void Read_MPU6050(void)
 	rawGyrox_Y =  AccelGyro[4];
 	rawGyrox_Z =  AccelGyro[5];
 
-	beta = 0.2f;
+	beta = acc_compensation;
 	
 	if (T_center < 40) 
 	{
-		beta =  2.0f;			
+		beta =  acc_compensation_ground;			
 	}
 	
 	if (Mode == calibation_mode) 
