@@ -362,7 +362,8 @@ void Read_MPU6050(void)
 	rawAccx_Y -= ay_diff;
 
 }
-
+uint8_t Buf[6] ={0};
+int8_t serial__ = 0;
 void PID_controller(void)
 {
 
@@ -405,6 +406,27 @@ void PID_controller(void)
 	motor_B = T_center +Del_pitch	-Del_roll +Del_yaw;
 	motor_C = T_center -Del_pitch	-Del_roll -Del_yaw;
 	motor_D = T_center -Del_pitch	+Del_roll +Del_yaw;	
+	
+	Drive_motor_output();	
+
+	serial__++;
+	if(serial__ == 2)
+	{
+		serial__ =0;
+		
+		int16_t data_temp = Del_pitch;
+		Buf[0] = (uint16_t)data_temp;
+		Buf[1] = (uint16_t)data_temp>>8;
+		
+		data_temp = (float)cal_pitch * 10.0f;
+		Buf[2] = (uint16_t)data_temp;
+		Buf[3] = (uint16_t)data_temp>>8;
+		
+		Buf[4] = 0x0D; //CR
+		Buf[5] = 0x0A; //LF
+
+		HAL_UART_Transmit_DMA(&huart1, Buf, 6);
+	}
 	
 // for v929
 //	motor_A = T_center +Del_pitch	+Del_roll +Del_yaw;

@@ -279,7 +279,6 @@ void flip_PD_controller(void)
 	motor_C =  -Del_pitch	-Del_roll -Del_yaw;
 	motor_D =  -Del_pitch	+Del_roll +Del_yaw;	
 	
-	Drive_motor_output();	
 }
 
 /* USER CODE END 0 */
@@ -307,7 +306,7 @@ int main(void)
   MX_TIM2_Init();
   MX_TIM3_Init();
 //  MX_USB_DEVICE_Init();
-//  MX_USART1_UART_Init();
+  MX_USART1_UART_Init();
   MX_TIM14_Init();
   MX_TIM16_Init();
 //  MX_TIM17_Init();
@@ -653,7 +652,7 @@ static void MX_USART1_UART_Init(void)
 
   huart1.Instance = USART1;
   huart1.Init.BaudRate = 115200;
-  huart1.Init.WordLength = UART_WORDLENGTH_7B;
+  huart1.Init.WordLength = UART_WORDLENGTH_8B;
   huart1.Init.StopBits = UART_STOPBITS_1;
   huart1.Init.Parity = UART_PARITY_NONE;
   huart1.Init.Mode = UART_MODE_TX_RX;
