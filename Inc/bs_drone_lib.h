@@ -17,7 +17,7 @@
 #define Compass_SENSITIVITY       	1090.0f
 #define M_PIf       								3.14159265358979323846f
 #define M_PI                        M_PIf    
-#define sampleFreq                  250.0f     			    // 200 hz sample rate!   
+#define sampleFreq                  250.0f //  250.0f     			    // 200 hz sample rate!   
 #define limmit_I                    300.0f    
 
 #define acc_compensation 0.3f
@@ -222,12 +222,14 @@ void stabilize_fn(void)
 {
 	static int8_t ld_blink;
 	
-	ld_blink++;
-	if(ld_blink >= 20)
-	{
-		ld_blink = 0;
-		HAL_GPIO_TogglePin(LED_L_GPIO_Port, LED_L_Pin);
-	}
+	HAL_GPIO_WritePin(LED_L_GPIO_Port, LED_L_Pin, GPIO_PIN_SET);
+	
+//	ld_blink++;
+//	if(ld_blink >= 20)
+//	{
+//		ld_blink = 0;
+//		HAL_GPIO_TogglePin(LED_L_GPIO_Port, LED_L_Pin);
+//	}
 	
 	Read_MPU6050();
 	
@@ -246,6 +248,8 @@ void stabilize_fn(void)
 	}
 
 	Drive_motor_output(); 
+	
+	HAL_GPIO_WritePin(LED_L_GPIO_Port, LED_L_Pin, GPIO_PIN_RESET);
 }
 
 void Initial_MPU6050(void)
@@ -270,10 +274,10 @@ void Initial_MPU6050(void)
 	MPU6050_WriteBits(MPU6050_DEFAULT_ADDRESS, MPU6050_RA_GYRO_CONFIG, MPU6050_GCONFIG_FS_SEL_BIT, MPU6050_GCONFIG_FS_SEL_LENGTH, MPU6050_GYRO_FS_2000);
 	HAL_Delay(1);
 	
-	MPU6050_WriteBits(MPU6050_DEFAULT_ADDRESS, MPU6050_RA_CONFIG, MPU6050_CFG_DLPF_CFG_BIT, MPU6050_CFG_DLPF_CFG_LENGTH, MPU6050_DLPF_BW_98);
+	MPU6050_WriteBits(MPU6050_DEFAULT_ADDRESS, MPU6050_RA_CONFIG, MPU6050_CFG_DLPF_CFG_BIT, MPU6050_CFG_DLPF_CFG_LENGTH, MPU6050_DLPF_BW_256);
 	HAL_Delay(1);
 			
-	MPU6050_WriteBits(MPU6050_DEFAULT_ADDRESS, MPU6050_RA_SMPLRT_DIV, 7, 8, 3);
+	MPU6050_WriteBits(MPU6050_DEFAULT_ADDRESS, MPU6050_RA_SMPLRT_DIV, 7, 8, 15);
 	HAL_Delay(1);
 
 	//    interupt(Enable)
@@ -457,7 +461,7 @@ void Drive_motor_output(void)
 
 void AHRS(void)
 {
-	static float dt = 0.004f; 	
+	static float dt = 0.002f; 	
 	float gx = (((float)rawGyrox_X)/GYROSCOPE_SENSITIVITY)*(M_PIf/180.0f);
 	float gy = (((float)rawGyrox_Y)/GYROSCOPE_SENSITIVITY)*(M_PIf/180.0f);
 	float gz = (((float)rawGyrox_Z)/GYROSCOPE_SENSITIVITY)*(M_PIf/180.0f);
@@ -517,8 +521,8 @@ void AHRS(void)
 		/* Compute pitch/roll angles */
     q_pitch =  -(atan2f(rMat[2][1], rMat[2][2]) * (1800.0f / M_PIf));
     q_roll  =  -(((0.5f * M_PIf) - acosf(-rMat[2][0])) * (1800.0f / M_PIf));
-    q_yaw   =  ((atan2f(rMat[1][0], rMat[0][0]) * (1800.0f / M_PIf) + magneticDeclination));
-		if (q_yaw < 0) q_yaw += 3600;
+//    q_yaw   =  ((atan2f(rMat[1][0], rMat[0][0]) * (1800.0f / M_PIf) + magneticDeclination));
+//		if (q_yaw < 0) q_yaw += 3600;
 }
 
 
