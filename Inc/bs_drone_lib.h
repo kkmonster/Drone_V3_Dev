@@ -49,6 +49,18 @@ int16_t rawGyrox_X = 1;
 int16_t rawGyrox_Y = 1;
 int16_t rawGyrox_Z = 1;
 
+typedef struct
+{
+  __IO float X2;
+  __IO float X1;
+  __IO float Y2;
+  __IO float Y1;
+  __IO float Y0;
+} filted_data;
+
+filted_data filed_yaw;
+filted_data filed_pitch;
+
 volatile uint8_t Flag_setPID_gain_success = 0;
 volatile int16_t magneticDeclination = 0;
 volatile float Ref_yaw=0, Ref_pitch=0, Ref_roll=0 ;
@@ -139,6 +151,7 @@ float abs_user(float x);
 uint32_t milli(void);
 void calibation_fn(void);
 void stabilize_fn(void);
+float Butterworth_filter(filted_data* filted, float x_data);
 
 void Sampling_task(void)
 {
@@ -397,10 +410,10 @@ void PID_controller(void)
 		Sum_Error_pitch = constrain((Sum_Error_pitch + (Errer_pitch /sampleFreq)), -100.0f , 100.0f) ;
 		Sum_Error_roll =  constrain((Sum_Error_roll  + (Error_roll  /sampleFreq)), -100.0f , 100.0f) ;
 	}
-	
-	D_Error_yaw =  (Error_yaw-Buf_D_Error_yaw)    *sampleFreq ;
-	D_Error_pitch =(Errer_pitch-Buf_D_Errer_pitch)*sampleFreq;
-	D_Error_roll = (Error_roll-Buf_D_Error_roll)  *sampleFreq;
+
+	D_Error_yaw   =  (Error_yaw-Buf_D_Error_yaw)*sampleFreq ;
+	D_Error_pitch = Butterworth_filter(&filed_pitch,(Errer_pitch-Buf_D_Errer_pitch)*sampleFreq);
+	D_Error_roll  = Butterworth_filter(&filed_yaw,(Error_roll-Buf_D_Error_roll)*sampleFreq);
 
 	Del_yaw		= (Kp_yaw   * Error_yaw)	+ (Ki_yaw	  * Sum_Error_yaw) + constrain((Kd_yaw * D_Error_yaw), -1500, 1500);
 	Del_pitch	= (Kp_pitch * Errer_pitch)	+ (Ki_pitch	* Sum_Error_pitch) + constrain((Kd_pitch * D_Error_pitch), -1500, 1500);
@@ -746,5 +759,22 @@ void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin)
 uint32_t milli(void)
 {
 	return HAL_GetTick();
+}
+        
+float Butterworth_filter(filted_data *filted, float x_data)
+{
+	// lowpass filter butterworth order 2nd fc 248 hz sampling 500hz
+
+	filted->Y2 = filted->Y1;
+	filted->Y1 = filted->Y0 ;
+	
+	float nume = (x_data + 2.0f * filted->X1 +  filted->X2);
+	float denom = (1.9644605802052317f * filted->Y1 +  0.96508117389913461f * filted->Y2);
+	filted->Y0 = 0.98238543852609161f * nume - denom;
+	
+	filted->X2 = filted->X1;
+	filted->X1 = x_data;
+	
+	return filted->Y0;
 }
 #endif
