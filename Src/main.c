@@ -100,10 +100,13 @@ void Function1_call(void)
 	}
 	_function1_lock  = 0;
 	
+	_function2_lock = 0;   // flip finish 
+	
 	if(_function2_lock == 0)Mode = stabilize_mode;
 }
 
 volatile static float angle_target,flip_pitch, flip_roll, flip_speed = 2000, flip_cutpower = 180, flip_Active_ahrs = 358, flip_stop = 355;
+
 void Function2_call(void)
 {
 //	static float flip_pitch, flip_speed, flip_cutpower, flip_stop;
@@ -131,54 +134,12 @@ void Function2_call(void)
 		
 	}else if(_function2_lock == 4) { // flip process
 
+		//if(abs_user(angle_target) < 360) angle_target += 0.07f;
 		
-		if(abs_user(angle_target) < 360) angle_target += 0.7f;
+		angle_target = (float)ch2 * 3.6f;
+		flip_PD_controller();
 		
-		if(abs_user(flip_pitch) >= flip_stop)	_function2_lock = 0;   // flip finish 
-		
-	static float cal_pitch ;
-	static float cal_roll  ;
-
-	Read_MPU6050();	
-	
-	float flip_gx = (((float)rawGyrox_X)/GYROSCOPE_SENSITIVITY);
-	float flip_gy = (((float)rawGyrox_Y)/GYROSCOPE_SENSITIVITY);
-
-	flip_pitch -= flip_gx * period_dt;
-	flip_roll  -=	flip_gy * period_dt;
-	
-	float Buf_D_Error_yaw   =Error_yaw;
-	float Buf_D_Errer_pitch =Errer_pitch;
-	float Buf_D_Error_roll  =Error_roll; 
-     
-//	cal_pitch = Smooth_filter(0.95f, flip_pitch, cal_pitch);
-//	cal_roll  = Smooth_filter(0.95f, flip_roll, cal_roll);
-	
-	cal_pitch = flip_pitch;
-	cal_roll  = flip_roll;
-	
-	
-	Error_yaw 	=    0 - ((float)rawGyrox_Z)/GYROSCOPE_SENSITIVITY;
-	Errer_pitch =  angle_target - ((float)cal_pitch)	;
-	Error_roll 	=    0 + ((float)cal_roll)	;
-	
-	D_Error_yaw   = (Error_yaw-Buf_D_Error_yaw)*sampleFreq ;
-	D_Error_pitch = Butterworth_filter(&filed_pitch,(Errer_pitch-Buf_D_Errer_pitch)*sampleFreq);
-	D_Error_roll  = Butterworth_filter(&filed_yaw,(Error_roll-Buf_D_Error_roll)*sampleFreq);
-
-
-	Del_yaw		= constrain((Kp_yaw   * Error_yaw), -2300, 2300);   + constrain((Kd_yaw   * D_Error_yaw),   -1500, 1500);
-	Del_pitch	= constrain((Kp_pitch * Errer_pitch), -2300, 2300); + constrain((Kd_pitch * D_Error_pitch), -1500, 1500);
-	Del_roll	= constrain((Kp_roll  * Error_roll), -2300, 2300);  + constrain((Kd_roll  * D_Error_roll),  -1500, 1500);
-	
-	motor_A =  +Del_pitch	+Del_roll -Del_yaw;
-	motor_B =  +Del_pitch	-Del_roll +Del_yaw;
-	motor_C =  -Del_pitch	-Del_roll -Del_yaw;
-	motor_D =  -Del_pitch	+Del_roll +Del_yaw;	
-		
-	Drive_motor_output();	
-		
-	if (abs_user(flip_pitch) > 360 || abs_user(cal_roll) > 360)_function2_lock ;
+		//if (abs_user(flip_pitch) > 360 || abs_user(cal_roll) > 360)	_function2_lock = 0;   // flip finish 
 		
 		
 	//-----------------------------------------------------------------------------------------------------------//	
@@ -228,37 +189,35 @@ void flip_PD_controller(void)
 	float flip_gx = (((float)rawGyrox_X)/GYROSCOPE_SENSITIVITY);
 	float flip_gy = (((float)rawGyrox_Y)/GYROSCOPE_SENSITIVITY);
 
-	flip_pitch -= flip_gx * 0.004f;
-	flip_roll  -=	flip_gy * 0.004f;
+	flip_pitch -= flip_gx * 0.002f;
+	flip_roll  -=	flip_gy * 0.002f;
 	
-	float Buf_D_Error_yaw   =Error_yaw;
-	float Buf_D_Errer_pitch =Errer_pitch;
-	float Buf_D_Error_roll  =Error_roll; 
+	float flip_Buf_D_Errer_pitch = Errer_pitch;
+	float flip_Buf_D_Error_roll  = Error_roll; 
      
 //	cal_pitch = Smooth_filter(0.95f, flip_pitch, cal_pitch);
 //	cal_roll  = Smooth_filter(0.95f, flip_roll, cal_roll);
 	
 	cal_pitch = flip_pitch;
 	cal_roll  = flip_roll;
-	
-//	T_center_buffer    = (float)ch3 *   20.0f;
 
-//	//  T_center = flip_speed;
-//	T_center = Smooth_filter(0.6f, T_center_buffer, T_center);
-	
 	Error_yaw 	=    0 - ((float)rawGyrox_Z)/GYROSCOPE_SENSITIVITY;
 	Errer_pitch =  angle_target - ((float)cal_pitch)	;
-	Error_roll 	=    0 + ((float)cal_roll)	;
-
-
-	D_Error_yaw =  (Error_yaw-Buf_D_Error_yaw)    *sampleFreq ;
-	D_Error_pitch =(Errer_pitch-Buf_D_Errer_pitch)*sampleFreq;
-	D_Error_roll = (Error_roll-Buf_D_Error_roll)  *sampleFreq;
-
-	Del_yaw		= constrain((Kp_yaw   * Error_yaw), -2300, 2300);   + constrain((Kd_yaw   * D_Error_yaw),   -1500, 1500);
-	Del_pitch	= constrain((Kp_pitch * Errer_pitch), -2300, 2300); + constrain((Kd_pitch * D_Error_pitch), -1500, 1500);
-	Del_roll	= constrain((Kp_roll  * Error_roll), -2300, 2300);  + constrain((Kd_roll  * D_Error_roll),  -1500, 1500);
+	Error_roll 	=    0          + ((float)cal_roll)	;
 	
+	D_Error_pitch = Butterworth_filter(&filed_pitch,(Errer_pitch-flip_Buf_D_Errer_pitch)*sampleFreq);
+	D_Error_roll  = Butterworth_filter(&filed_yaw,(Error_roll-flip_Buf_D_Error_roll)  *sampleFreq);
+	
+//	D_Error_pitch =(Errer_pitch-flip_Buf_D_Errer_pitch)*sampleFreq;
+//	D_Error_roll = (Error_roll-flip_Buf_D_Error_roll)  *sampleFreq;
+
+//	Del_yaw		= constrain((Kp_yaw   * Error_yaw), -1000, 1000);   
+//	Del_pitch	= constrain((Kp_pitch * Errer_pitch), -2300, 2300) + constrain((Kd_pitch * D_Error_pitch), -1000, 1000);
+//	Del_roll	= constrain((Kp_roll  * Error_roll), -2300, 2300)  + constrain((Kd_roll  * D_Error_roll),  -1000, 1000);
+	
+	Del_yaw		= (Kp_yaw   * Error_yaw);   
+	Del_pitch	= (Kp_pitch * Errer_pitch + Kd_pitch * D_Error_pitch);
+	Del_roll	= (Kp_roll  * Error_roll + Kd_roll * D_Error_roll);
 	
 	motor_A =  +Del_pitch	+Del_roll -Del_yaw;
 	motor_B =  +Del_pitch	-Del_roll +Del_yaw;

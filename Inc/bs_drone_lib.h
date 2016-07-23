@@ -12,7 +12,7 @@
 
 
 
-#define ACCELEROMETER_SENSITIVITY   8192.0f  
+#define ACCELEROMETER_SENSITIVITY   4096.0f  
 #define GYROSCOPE_SENSITIVITY       16.4f  
 #define Compass_SENSITIVITY       	1090.0f
 #define M_PIf       								3.14159265358979323846f
@@ -21,7 +21,7 @@
 #define period_dt                   0.002f // 500 hz sample rate!   
 #define limmit_I                    300.0f    
 
-#define acc_compensation 0.3f
+#define acc_compensation 0.2f
 #define acc_compensation_ground 2.0f
 #define spi_buffer_size 96
 
@@ -99,6 +99,8 @@ int16_t ay_diff = 0;
 int16_t az_diff = 0;
 
 volatile uint8_t  calibation_pass = 0;
+volatile float  Acc_start = ACCELEROMETER_SENSITIVITY;
+
 volatile uint8_t  spi_rx_data[spi_buffer_size] = {0};
 volatile uint8_t  spi_rx_data_index = 0;
 
@@ -208,7 +210,7 @@ void calibation_fn(void)
 	float ax_x = abs_user(rawAccx_X-acx_d);
 	float ay_x = abs_user(rawAccx_Y-acy_d);
 
-	float deadband = 2;
+	const	float deadband = 2;
 
 	if ((gx_x < deadband)&&(gy_x < deadband)&&(gz_x < deadband)&&(ax_x < deadband)&&(ay_x < deadband))
 	{
@@ -230,6 +232,8 @@ void calibation_fn(void)
 	_gyz_d = gyz_d;
 	_acx_d = acx_d; 
 	_acy_d = acy_d;
+	
+
 }
 
 void stabilize_fn(void)
@@ -371,16 +375,17 @@ void Read_MPU6050(void)
 		gyz_d = Smooth_filter(0.005f, rawGyrox_Z, gyz_d);
 		acx_d = Smooth_filter(0.005f, rawAccx_X, acx_d);
 		acy_d = Smooth_filter(0.005f, rawAccx_Y, acy_d);	
-		//f     = Smooth_filter(0.005f, rawAccx_Z, f);		
+		Acc_start = Smooth_filter(0.1f, (float)rawAccx_Z/ACCELEROMETER_SENSITIVITY, Acc_start);		
+		
+	}else{
+	
+		rawGyrox_X -= gx_diff;
+		rawGyrox_Y -= gy_diff;
+		rawGyrox_Z -= gz_diff;
+		
+		rawAccx_X -= ax_diff;
+		rawAccx_Y -= ay_diff;
 	}
-	
-	rawGyrox_X -= gx_diff;
-	rawGyrox_Y -= gy_diff;
-	rawGyrox_Z -= gz_diff;
-	
-	rawAccx_X -= ax_diff;
-	rawAccx_Y -= ay_diff;
-
 }
 
 void PID_controller(void)
@@ -487,9 +492,10 @@ void AHRS(void)
 	float ex = 0, ey = 0, ez = 0;
 	float qa, qb, qc;
 
+	
     // Use measured acceleration vector
     recipNorm = sq(ax) + sq(ay) + sq(az);
-    if (recipNorm > 0.01f) 
+    if (recipNorm > 0.01f && (recipNorm * 0.8f) < sq(Acc_start)) 
 		{
         // Normalise accelerometer measurement
         recipNorm = invSqrt(recipNorm);
@@ -606,15 +612,15 @@ void getPIDgain(uint8_t spi_rx_data_index)
 
 	if (checksum_buffer == sum)
 	{
-		Kp_roll = (float)Kp_roll_tmp * 0.060f;
+		Kp_roll = (float)Kp_roll_tmp * 0.050f;
 		Ki_roll = (float)Ki_roll_tmp * 0.025f;
 		Kd_roll = (float)Kd_roll_tmp * 0.025f;
 
-		Kp_pitch = (float)Kp_pitch_tmp * 0.060f;
+		Kp_pitch = (float)Kp_pitch_tmp * 0.050f;
 		Ki_pitch = (float)Ki_pitch_tmp * 0.025f;
 		Kd_pitch = (float)Kd_pitch_tmp * 0.025f;
 
-		Kp_yaw = (float)Kp_yaw_tmp * 0.060f;
+		Kp_yaw = (float)Kp_yaw_tmp * 0.025f;
 		Ki_yaw = (float)Ki_yaw_tmp * 0.025f;
 		Kd_yaw = (float)Kd_yaw_tmp * 0.020f;
 
