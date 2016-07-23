@@ -63,6 +63,9 @@ uint8_t _function1_lock = 0;
 uint8_t _function2_lock = 0;
 
 void flip_PD_controller(void);
+volatile static float angle_target,flip_pitch, flip_roll; 
+volatile static uint16_t flip_Jump_time, flip_Jump_time_start;
+volatile static float flip_Jump_gain = 1; 
 
 #include "bs_drone_lib.h"
 /* USER CODE END PV */
@@ -105,8 +108,6 @@ void Function1_call(void)
 	if(_function2_lock == 0)Mode = stabilize_mode;
 }
 
-volatile static float angle_target,flip_pitch, flip_roll, flip_speed = 2000, flip_cutpower = 180, flip_Active_ahrs = 358, flip_stop = 355;
-
 void Function2_call(void)
 {
 //	static float flip_pitch, flip_speed, flip_cutpower, flip_stop;
@@ -114,68 +115,48 @@ void Function2_call(void)
 	
 	if(_function2_lock == 1) // initialize process
 	{
+		stabilize_fn();	
+		
 		flip_pitch = 0;
 		flip_roll = 0;
 		angle_target = 0;
-		
-		_function2_lock = 4;
+		flip_Jump_time_start = 0;
+		_function2_lock = 2;
 		
 	}else if(_function2_lock == 2) { // prepare process
 		
-		ch1 = 0;
-		ch2 = 0;
-		stabilize_fn();					
-		if (abs_user(q_pitch) < 15 && abs_user(q_roll) < 15) _function2_lock = 4;
+		stabilize_fn();
+
+		if (abs_user(q_pitch) < 20 && abs_user(q_roll) < 20) 
+		{
+			_function2_lock = 3;
+			flip_Jump_gain = 1.5f;
+		}
 		
 	}else if(_function2_lock == 3) { // jump process
 
+		stabilize_fn();
 		
-		_function2_lock = 4;
-		
+		flip_Jump_time_start++;
+		if (flip_Jump_time_start >= flip_Jump_time)
+		{
+			_function2_lock = 4;
+			flip_Jump_gain = 1;
+			if (q_pitch > 0){
+				angle_target = -360;
+			}else{
+				angle_target = 360;
+			}
+		}
 	}else if(_function2_lock == 4) { // flip process
-
-		//if(abs_user(angle_target) < 360) angle_target += 0.07f;
 		
-		angle_target = (float)ch2 * 3.6f;
 		flip_PD_controller();
 		
-		//if (abs_user(flip_pitch) > 360 || abs_user(cal_roll) > 360)	_function2_lock = 0;   // flip finish 
-		
-		
-	//-----------------------------------------------------------------------------------------------------------//	
-//		Read_MPU6050();
-//		float flip_gx = (((float)rawGyrox_X)/GYROSCOPE_SENSITIVITY);
-//	  float flip_gy = (((float)rawGyrox_Y)/GYROSCOPE_SENSITIVITY);
-//	  float flip_gz = (((float)rawGyrox_Z)/GYROSCOPE_SENSITIVITY);
-//		
-//		
-//		flip_pitch += flip_gx * 0.004f;
-//		
-//		
-//		motor_A = flip_speed;
-//		motor_B = flip_speed;
-//		motor_C = 0;
-//		motor_D = 0;
-//		Drive_motor_output();	
-//		
-//		if (abs_user(flip_pitch) > flip_cutpower)
-//		{
-//			
-//			motor_A = 0;
-//			motor_B = 0;
-//			motor_C = flip_speed;
-//			motor_D = flip_speed;
-//			Drive_motor_output();
-//			
-//			if (abs_user(flip_pitch) > flip_Active_ahrs)
-//			{
-//				beta =  2.0f;		 // normal 0.2		
-//				AHRS();
-//			}
-//		}
-		
-
-	}else	if(_function2_lock == 0) Mode = stabilize_mode;   // GO TO stabilize_mode
+		if (abs_user(flip_pitch) >= 360 || abs_user(flip_roll) >= 359){ // flip finish 
+			_function2_lock = 0;   
+			Mode = stabilize_mode;   // GO TO stabilize_mode
+		}
+	}
 	
 }
 
@@ -195,14 +176,11 @@ void flip_PD_controller(void)
 	float flip_Buf_D_Errer_pitch = Errer_pitch;
 	float flip_Buf_D_Error_roll  = Error_roll; 
      
-//	cal_pitch = Smooth_filter(0.95f, flip_pitch, cal_pitch);
-//	cal_roll  = Smooth_filter(0.95f, flip_roll, cal_roll);
-	
 	cal_pitch = flip_pitch;
 	cal_roll  = flip_roll;
 
 	Error_yaw 	=    0 - ((float)rawGyrox_Z)/GYROSCOPE_SENSITIVITY;
-	Errer_pitch =  angle_target - ((float)cal_pitch)	;
+	Errer_pitch =  angle_target   - ((float)cal_pitch)	;
 	Error_roll 	=    0          + ((float)cal_roll)	;
 	
 	D_Error_pitch = Butterworth_filter(&filed_pitch,(Errer_pitch-flip_Buf_D_Errer_pitch)*sampleFreq);
@@ -215,9 +193,9 @@ void flip_PD_controller(void)
 //	Del_pitch	= constrain((Kp_pitch * Errer_pitch), -2300, 2300) + constrain((Kd_pitch * D_Error_pitch), -1000, 1000);
 //	Del_roll	= constrain((Kp_roll  * Error_roll), -2300, 2300)  + constrain((Kd_roll  * D_Error_roll),  -1000, 1000);
 	
-	Del_yaw		= (Kp_yaw   * Error_yaw);   
-	Del_pitch	= (Kp_pitch * Errer_pitch + Kd_pitch * D_Error_pitch);
-	Del_roll	= (Kp_roll  * Error_roll + Kd_roll * D_Error_roll);
+	Del_yaw		= (Kp_yaw  * Error_yaw);   
+	Del_pitch	= (Kp_flip * Errer_pitch + Kd_flip * D_Error_pitch);
+	Del_roll	= (Kp_flip * Error_roll + Kd_flip * D_Error_roll);
 	
 	motor_A =  +Del_pitch	+Del_roll -Del_yaw;
 	motor_B =  +Del_pitch	-Del_roll +Del_yaw;

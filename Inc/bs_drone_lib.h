@@ -21,7 +21,7 @@
 #define period_dt                   0.002f // 500 hz sample rate!   
 #define limmit_I                    300.0f    
 
-#define acc_compensation 0.2f
+#define acc_compensation 0.3f
 #define acc_compensation_ground 2.0f
 #define spi_buffer_size 96
 
@@ -89,6 +89,10 @@ volatile float Kd_pitch = 0;
 volatile float Kp_yaw = 0;
 volatile float Ki_yaw = 0;
 volatile float Kd_yaw = 0;
+
+volatile float Kp_flip = 0;
+volatile float Kd_flip = 0;
+		
 
 // set gyro offset
 int16_t gx_diff = 0;
@@ -399,10 +403,11 @@ void PID_controller(void)
 	static float cal_pitch ;
 	static float cal_roll  ;
 		
-	cal_pitch = Smooth_filter(0.9f, (float)q_pitch*0.1f, cal_pitch);
-	cal_roll = Smooth_filter(0.9f, (float)q_roll*0.1f, cal_roll);
+	cal_pitch = Smooth_filter(0.95f, (float)q_pitch*0.1f, cal_pitch);
+	cal_roll = Smooth_filter(0.95f, (float)q_roll*0.1f, cal_roll);
 	
-	T_center_buffer    = (float)ch3 *   20.0f;
+	
+	T_center_buffer    = (float)ch3 * 20.0f * flip_Jump_gain;
 	
 	T_center = Smooth_filter(0.6f, T_center_buffer, T_center);
 
@@ -495,7 +500,7 @@ void AHRS(void)
 	
     // Use measured acceleration vector
     recipNorm = sq(ax) + sq(ay) + sq(az);
-    if (recipNorm > 0.01f && (recipNorm * 0.8f) < sq(Acc_start)) 
+    if (recipNorm > 0.01f && (recipNorm * 0.64f) < sq(Acc_start)) 
 		{
         // Normalise accelerometer measurement
         recipNorm = invSqrt(recipNorm);
@@ -620,10 +625,23 @@ void getPIDgain(uint8_t spi_rx_data_index)
 		Ki_pitch = (float)Ki_pitch_tmp * 0.025f;
 		Kd_pitch = (float)Kd_pitch_tmp * 0.025f;
 
+//		Kp_yaw = (float)Kp_yaw_tmp * 0.025f;
+//		Ki_yaw = (float)Ki_yaw_tmp * 0.025f;
+//		Kd_yaw = (float)Kd_yaw_tmp * 0.020f;
+
+		Kp_flip = (float)Kp_yaw_tmp * 0.060f;
+		Kd_flip = (float)Kd_yaw_tmp * 0.020f;
+		flip_Jump_time = Ki_yaw_tmp;
+		
+		
 		Kp_yaw = (float)Kp_yaw_tmp * 0.025f;
 		Ki_yaw = (float)Ki_yaw_tmp * 0.025f;
 		Kd_yaw = (float)Kd_yaw_tmp * 0.020f;
 
+		Kp_yaw =8;
+		Ki_yaw =1;
+		Kd_yaw =0;
+		
 		Flag_setPID_gain_success = 1;
 		
 	}else{
@@ -648,7 +666,7 @@ void getRCcommand(uint8_t spi_rx_data_index)
 		ch2 = pitch_tmp;
 		ch3 = throttle_tmp;
 		ch4 = yaw_tmp;
-		watchdog = 200;
+		watchdog = 500;
 		if(ch3 < 3 && calibation_pass == 1) Mode = stabilize_mode;
 	}
 }
