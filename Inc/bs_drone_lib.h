@@ -17,7 +17,8 @@
 #define Compass_SENSITIVITY       	1090.0f
 #define M_PIf       								3.14159265358979323846f
 #define M_PI                        M_PIf    
-#define sampleFreq                  250.0f //  250.0f     			    // 200 hz sample rate!   
+#define sampleFreq                  500.0f // 500 hz sample rate!   
+#define period_dt                   0.002f // 500 hz sample rate!   
 #define limmit_I                    300.0f    
 
 #define acc_compensation 0.3f
@@ -235,14 +236,14 @@ void stabilize_fn(void)
 {
 	static int8_t ld_blink;
 	
-	HAL_GPIO_WritePin(LED_L_GPIO_Port, LED_L_Pin, GPIO_PIN_SET);
+//	HAL_GPIO_WritePin(LED_L_GPIO_Port, LED_L_Pin, GPIO_PIN_SET);
 	
-//	ld_blink++;
-//	if(ld_blink >= 20)
-//	{
-//		ld_blink = 0;
-//		HAL_GPIO_TogglePin(LED_L_GPIO_Port, LED_L_Pin);
-//	}
+	ld_blink++;
+	if(ld_blink >= 20)
+	{
+		ld_blink = 0;
+		HAL_GPIO_TogglePin(LED_L_GPIO_Port, LED_L_Pin);
+	}
 	
 	Read_MPU6050();
 	
@@ -262,7 +263,7 @@ void stabilize_fn(void)
 
 	Drive_motor_output(); 
 	
-	HAL_GPIO_WritePin(LED_L_GPIO_Port, LED_L_Pin, GPIO_PIN_RESET);
+//	HAL_GPIO_WritePin(LED_L_GPIO_Port, LED_L_Pin, GPIO_PIN_RESET);
 }
 
 void Initial_MPU6050(void)
@@ -302,7 +303,7 @@ void Initial_MPU6050(void)
 void MPU6050_WriteBits(uint8_t slaveAddr, uint8_t regAddr, uint8_t bitStart, uint8_t length, uint8_t data)
 {
     uint8_t tmp;
-	HAL_I2C_Mem_Read(&hi2c1, slaveAddr, regAddr, 1, &tmp, 1, 1);
+	  HAL_I2C_Mem_Read(&hi2c1, slaveAddr, regAddr, 1, &tmp, 1, 1);
     uint8_t mask = ((1 << length) - 1) << (bitStart - length + 1);
     data <<= (bitStart - length + 1); // shift data into correct position
     data &= mask;   // zero all non-important bits in data
@@ -314,7 +315,7 @@ void MPU6050_WriteBits(uint8_t slaveAddr, uint8_t regAddr, uint8_t bitStart, uin
 void MPU6050_WriteBit(uint8_t slaveAddr, uint8_t regAddr, uint8_t bitNum, uint8_t data)
 {
     uint8_t tmp;
-	HAL_I2C_Mem_Read(&hi2c1, slaveAddr, regAddr, 1, &tmp, 1, 1);
+	  HAL_I2C_Mem_Read(&hi2c1, slaveAddr, regAddr, 1, &tmp, 1, 1);
     tmp = (data != 0) ? (tmp | (1 << bitNum)) : (tmp & ~(1 << bitNum));
     HAL_I2C_Mem_Write(&hi2c1,slaveAddr,regAddr,1,&tmp,1,1);
 }
@@ -322,7 +323,7 @@ void MPU6050_WriteBit(uint8_t slaveAddr, uint8_t regAddr, uint8_t bitNum, uint8_
 void MPU6050_ReadBits(uint8_t slaveAddr, uint8_t regAddr, uint8_t bitStart, uint8_t length, uint8_t *data)
 {
     uint8_t tmp;
-	HAL_I2C_Mem_Read(&hi2c1, slaveAddr, regAddr, 1, &tmp, 1, 1);
+	  HAL_I2C_Mem_Read(&hi2c1, slaveAddr, regAddr, 1, &tmp, 1, 1);
     uint8_t mask = ((1 << length) - 1) << (bitStart - length + 1);
     tmp &= mask;
     tmp >>= (bitStart - length + 1);
@@ -332,7 +333,7 @@ void MPU6050_ReadBits(uint8_t slaveAddr, uint8_t regAddr, uint8_t bitStart, uint
 void MPU6050_ReadBit(uint8_t slaveAddr, uint8_t regAddr, uint8_t bitNum, uint8_t *data)
 {
     uint8_t tmp;
-	HAL_I2C_Mem_Read(&hi2c1,slaveAddr,regAddr,1,&tmp,1,1);
+	  HAL_I2C_Mem_Read(&hi2c1,slaveAddr,regAddr,1,&tmp,1,1);
     *data = tmp & (1 << bitNum);
 }
 
@@ -411,7 +412,7 @@ void PID_controller(void)
 		Sum_Error_roll =  constrain((Sum_Error_roll  + (Error_roll  /sampleFreq)), -100.0f , 100.0f) ;
 	}
 
-	D_Error_yaw   =  (Error_yaw-Buf_D_Error_yaw)*sampleFreq ;
+	D_Error_yaw   = (Error_yaw-Buf_D_Error_yaw)*sampleFreq ;
 	D_Error_pitch = Butterworth_filter(&filed_pitch,(Errer_pitch-Buf_D_Errer_pitch)*sampleFreq);
 	D_Error_roll  = Butterworth_filter(&filed_yaw,(Error_roll-Buf_D_Error_roll)*sampleFreq);
 
@@ -474,7 +475,7 @@ void Drive_motor_output(void)
 
 void AHRS(void)
 {
-	static float dt = 0.002f; 	
+	const float dt = period_dt; 	
 	float gx = (((float)rawGyrox_X)/GYROSCOPE_SENSITIVITY)*(M_PIf/180.0f);
 	float gy = (((float)rawGyrox_Y)/GYROSCOPE_SENSITIVITY)*(M_PIf/180.0f);
 	float gz = (((float)rawGyrox_Z)/GYROSCOPE_SENSITIVITY)*(M_PIf/180.0f);
@@ -482,10 +483,9 @@ void AHRS(void)
 	float ay = ((float)rawAccx_Y)/ACCELEROMETER_SENSITIVITY;
 	float az = ((float)rawAccx_Z)/ACCELEROMETER_SENSITIVITY;
 
-
-    float recipNorm;
-    float ex = 0, ey = 0, ez = 0;
-    float qa, qb, qc;
+	float recipNorm;
+	float ex = 0, ey = 0, ez = 0;
+	float qa, qb, qc;
 
     // Use measured acceleration vector
     recipNorm = sq(ax) + sq(ay) + sq(az);
@@ -606,24 +606,23 @@ void getPIDgain(uint8_t spi_rx_data_index)
 
 	if (checksum_buffer == sum)
 	{
-		Kp_roll = (float)Kp_roll_tmp * 0.025f;
+		Kp_roll = (float)Kp_roll_tmp * 0.060f;
 		Ki_roll = (float)Ki_roll_tmp * 0.025f;
 		Kd_roll = (float)Kd_roll_tmp * 0.025f;
 
-		Kp_pitch = (float)Kp_pitch_tmp * 0.025f;
+		Kp_pitch = (float)Kp_pitch_tmp * 0.060f;
 		Ki_pitch = (float)Ki_pitch_tmp * 0.025f;
 		Kd_pitch = (float)Kd_pitch_tmp * 0.025f;
 
-		Kp_yaw = (float)Kp_yaw_tmp * 0.025f;
+		Kp_yaw = (float)Kp_yaw_tmp * 0.060f;
 		Ki_yaw = (float)Ki_yaw_tmp * 0.025f;
-		Kd_yaw = (float)Kd_yaw_tmp * 0.025f;
+		Kd_yaw = (float)Kd_yaw_tmp * 0.020f;
 
 		Flag_setPID_gain_success = 1;
 		
 	}else{
 		
 		Flag_setPID_gain_success = 0;
-		
 	}
 }
 
@@ -763,7 +762,7 @@ uint32_t milli(void)
         
 float Butterworth_filter(filted_data *filted, float x_data)
 {
-	// lowpass filter butterworth order 2nd fc 248 hz sampling 500hz
+	// lowpass filter butterworth order 2nd fc  248 hz sampling 500hz
 
 	filted->Y2 = filted->Y1;
 	filted->Y1 = filted->Y0 ;
