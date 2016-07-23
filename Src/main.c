@@ -66,6 +66,7 @@ void flip_PD_controller(void);
 volatile static float angle_target,flip_pitch, flip_roll; 
 volatile static uint16_t flip_Jump_time, flip_Jump_time_start;
 volatile static float flip_Jump_gain = 1; 
+const int flip_exis = 355;
 
 #include "bs_drone_lib.h"
 /* USER CODE END PV */
@@ -130,7 +131,7 @@ void Function2_call(void)
 		if (abs_user(q_pitch) < 20 && abs_user(q_roll) < 20) 
 		{
 			_function2_lock = 3;
-			flip_Jump_gain = 1.5f;
+			flip_Jump_gain = 1.8f;
 		}
 		
 	}else if(_function2_lock == 3) { // jump process
@@ -143,16 +144,16 @@ void Function2_call(void)
 			_function2_lock = 4;
 			flip_Jump_gain = 1;
 			if (q_pitch > 0){
-				angle_target = -360;
-			}else{
 				angle_target = 360;
+			}else{
+				angle_target = -360;
 			}
 		}
 	}else if(_function2_lock == 4) { // flip process
 		
 		flip_PD_controller();
 		
-		if (abs_user(flip_pitch) >= 360 || abs_user(flip_roll) >= 359){ // flip finish 
+		if (abs_user(flip_pitch) >= flip_exis || abs_user(flip_roll) >= flip_exis){ // flip finish 
 			_function2_lock = 0;   
 			Mode = stabilize_mode;   // GO TO stabilize_mode
 		}
@@ -192,10 +193,10 @@ void flip_PD_controller(void)
 //	Del_yaw		= constrain((Kp_yaw   * Error_yaw), -1000, 1000);   
 //	Del_pitch	= constrain((Kp_pitch * Errer_pitch), -2300, 2300) + constrain((Kd_pitch * D_Error_pitch), -1000, 1000);
 //	Del_roll	= constrain((Kp_roll  * Error_roll), -2300, 2300)  + constrain((Kd_roll  * D_Error_roll),  -1000, 1000);
-	
-	Del_yaw		= (Kp_yaw  * Error_yaw);   
-	Del_pitch	= (Kp_flip * Errer_pitch + Kd_flip * D_Error_pitch);
-	Del_roll	= (Kp_flip * Error_roll + Kd_flip * D_Error_roll);
+
+	Del_yaw		= (Kp_yaw  * Error_yaw) + (Ki_yaw	  * Sum_Error_yaw);   
+	Del_pitch	= (Kp_flip * Errer_pitch + Kd_flip * D_Error_pitch)+ (Ki_pitch	* Sum_Error_pitch);
+	Del_roll	= (Kp_flip * Error_roll + Kd_flip * D_Error_roll)+ (Ki_roll	* Sum_Error_roll);
 	
 	motor_A =  +Del_pitch	+Del_roll -Del_yaw;
 	motor_B =  +Del_pitch	-Del_roll +Del_yaw;
