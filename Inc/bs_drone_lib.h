@@ -86,8 +86,8 @@ volatile float Kp_pitch = 0;
 volatile float Ki_pitch = 0;
 volatile float Kd_pitch = 0;
 
-volatile float Kp_yaw = 0;
-volatile float Ki_yaw = 0;
+volatile float Kp_yaw = 6;
+volatile float Ki_yaw = 1;
 volatile float Kd_yaw = 0;
 
 volatile float Kp_flip = 0;
@@ -159,6 +159,7 @@ uint32_t milli(void);
 void calibation_fn(void);
 void stabilize_fn(void);
 float Butterworth_filter(filted_data* filted, float x_data);
+void SET_filter_value(filted_data *filted, float value);
 
 void Sampling_task(void)
 {
@@ -220,13 +221,14 @@ void calibation_fn(void)
 	{
 		Mode = stabilize_mode;
 		calibation_pass = 1;
+		
 		gx_diff = gyx_d;
 		gy_diff = gyy_d;
 		gz_diff = gyz_d;
 		ax_diff = acx_d;
 		ay_diff = acy_d;
 
-		HAL_SPI_Receive_IT(&hspi1, (uint8_t*)(spi_rx_data + spi_rx_data_index), 1);
+//		HAL_SPI_Receive_IT(&hspi1, (uint8_t*)(spi_rx_data + spi_rx_data_index), 1);
 
 		LED_R_off();
 	}
@@ -407,7 +409,7 @@ void PID_controller(void)
 	cal_roll = Smooth_filter(0.95f, (float)q_roll*0.1f, cal_roll);
 	
 	
-	T_center_buffer    = (float)ch3 * 20.0f * flip_Jump_gain;
+	T_center_buffer    = constrain((float)ch3 * 20.0f * flip_Jump_gain, 0.0f, 2200.0f);
 	
 	T_center = Smooth_filter(0.6f, T_center_buffer, T_center);
 
@@ -497,10 +499,14 @@ void AHRS(void)
 	float ex = 0, ey = 0, ez = 0;
 	float qa, qb, qc;
 
+	  if(delay_compensate > 0)delay_compensate--;
 	
     // Use measured acceleration vector
     recipNorm = sq(ax) + sq(ay) + sq(az);
-    if (recipNorm > 0.01f && (recipNorm * 0.64f) < sq(Acc_start)) 
+
+//  	if (recipNorm > 0.01f && recipNorm < sq(Acc_start) * 2.0f && delay_compensate == 0) 
+
+  	if (recipNorm > 0.01f && delay_compensate <= 5) 
 		{
         // Normalise accelerometer measurement
         recipNorm = invSqrt(recipNorm);
@@ -512,13 +518,14 @@ void AHRS(void)
         ex += (ay * rMat[2][2] - az * rMat[2][1]);
         ey += (az * rMat[2][0] - ax * rMat[2][2]);
         ez += (ax * rMat[2][1] - ay * rMat[2][0]);
-
+			
+			  // Apply proportional and integral feedback
+				gx += beta * ex;
+				gy += beta * ey;
+				gz += beta * ez;
     }
 
-    // Apply proportional and integral feedback
-    gx += beta * ex;
-    gy += beta * ey;
-    gz += beta * ez;
+
 
     // Integrate rate of change of quaternion
     gx *= (0.5f * dt);
@@ -528,6 +535,7 @@ void AHRS(void)
     qa = q0;
     qb = q1;
     qc = q2;
+		
     q0 += (-qb * gx - qc * gy - q3 * gz);
     q1 += (qa * gx + qc * gz - q3 * gy);
     q2 += (qa * gy - qb * gz + q3 * gx);
@@ -633,14 +641,20 @@ void getPIDgain(uint8_t spi_rx_data_index)
 		Kd_flip = (float)Kd_yaw_tmp * 0.020f;
 		flip_Jump_time = Ki_yaw_tmp;
 		
-		
-		Kp_yaw = (float)Kp_yaw_tmp * 0.025f;
-		Ki_yaw = (float)Ki_yaw_tmp * 0.025f;
-		Kd_yaw = (float)Kd_yaw_tmp * 0.020f;
+		if (Kd_yaw_tmp < 1)
+		{
+			Kp_yaw = (float)Kp_yaw_tmp * 0.025f;
+			Ki_yaw = (float)Ki_yaw_tmp * 0.025f;
+			Kd_yaw = (float)Kd_yaw_tmp * 0.020f;
+			
+		} else {
+			
+			Kp_flip = (float)Kp_yaw_tmp * 0.060f;
+			Kd_flip = (float)Kd_yaw_tmp * 0.020f;
+			flip_Jump_time = Ki_yaw_tmp;		
+			
+		}
 
-		Kp_yaw =8;
-		Ki_yaw =1;
-		Kd_yaw =0;
 		
 		Flag_setPID_gain_success = 1;
 		
@@ -724,16 +738,23 @@ void HAL_SPI_RxCpltCallback(SPI_HandleTypeDef *hspi)
 		if (spi_rx_data[spi_rx_data_index-2] == command_code && spi_rx_data[spi_rx_data_index-1] == command_code )
 		{
 			spi_rx_data_index = 0;
-			Mode = Function_1_mode;
-			_function1_lock = 1;
+
+			if(Mode == stabilize_mode && T_center > 500){
+				Mode = Function_2_mode;  // force flip
+				_function2_lock = 1;		
+				delay_compensate = 1000;
+			}
 		}
 		
 		command_code = 0xf2 ;
 		if (spi_rx_data[spi_rx_data_index-2] == command_code && spi_rx_data[spi_rx_data_index-1] == command_code )
 		{
 			spi_rx_data_index = 0;
-			Mode = Function_2_mode;
-			_function2_lock = 1;			
+			if(Mode == stabilize_mode && T_center > 500){
+				Mode = Function_2_mode;  // force flip
+				_function2_lock = 1;		
+				delay_compensate = 1000;
+			}		
 		}		
 			
 		if (spi_rx_data_index >= 7)
@@ -799,5 +820,17 @@ float Butterworth_filter(filted_data *filted, float x_data)
 	filted->X1 = x_data;
 	
 	return filted->Y0;
+}
+
+void SET_filter_value(filted_data *filted, float value)
+{
+	// lowpass filter butterworth order 2nd fc  248 hz sampling 500hz
+
+	filted->Y2 = value;
+	filted->Y1 = value;
+	filted->Y0 = value;
+	filted->X2 = value;
+	filted->X1 = value;
+
 }
 #endif

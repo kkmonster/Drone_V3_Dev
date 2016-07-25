@@ -66,10 +66,11 @@ void flip_PD_controller(void);
 volatile static float angle_target,flip_pitch, flip_roll; 
 volatile static uint16_t flip_Jump_time, flip_Jump_time_start;
 volatile static float flip_Jump_gain = 1; 
-const int flip_exis = 355;
+const int flip_exis = 360;
+volatile int delay_compensate = 0;
 
 #include "bs_drone_lib.h"
-/* USER CODE END PV */
+/* USER CODE END PV */ 
 
 /* Private function prototypes -----------------------------------------------*/
 void SystemClock_Config(void);
@@ -128,10 +129,10 @@ void Function2_call(void)
 		
 		stabilize_fn();
 
-		if (abs_user(q_pitch) < 20 && abs_user(q_roll) < 20) 
+		if (abs_user(q_pitch*0.1f) < 20 && abs_user(q_roll*0.1f) < 20) 
 		{
 			_function2_lock = 3;
-			flip_Jump_gain = 1.8f;
+			flip_Jump_gain = 1.9f;
 		}
 		
 	}else if(_function2_lock == 3) { // jump process
@@ -143,11 +144,8 @@ void Function2_call(void)
 		{
 			_function2_lock = 4;
 			flip_Jump_gain = 1;
-			if (q_pitch > 0){
-				angle_target = 360;
-			}else{
-				angle_target = -360;
-			}
+			angle_target = -360;
+			Errer_pitch = angle_target; // ignore  step  command
 		}
 	}else if(_function2_lock == 4) { // flip process
 		
@@ -195,8 +193,10 @@ void flip_PD_controller(void)
 //	Del_roll	= constrain((Kp_roll  * Error_roll), -2300, 2300)  + constrain((Kd_roll  * D_Error_roll),  -1000, 1000);
 
 	Del_yaw		= (Kp_yaw  * Error_yaw) + (Ki_yaw	  * Sum_Error_yaw);   
-	Del_pitch	= (Kp_flip * Errer_pitch + Kd_flip * D_Error_pitch)+ (Ki_pitch	* Sum_Error_pitch);
-	Del_roll	= (Kp_flip * Error_roll + Kd_flip * D_Error_roll)+ (Ki_roll	* Sum_Error_roll);
+	
+	Del_pitch	= (Kp_flip * Errer_pitch + Kd_flip * D_Error_pitch) + (Ki_pitch	* Sum_Error_pitch);
+	
+	Del_roll	= (Kp_roll * Error_roll + Kd_roll * D_Error_roll) + (Ki_roll	* Sum_Error_roll);
 	
 	motor_A =  +Del_pitch	+Del_roll -Del_yaw;
 	motor_B =  +Del_pitch	-Del_roll +Del_yaw;
@@ -240,6 +240,7 @@ int main(void)
   MX_NVIC_Init();
 
   /* USER CODE BEGIN 2 */
+	HAL_SPI_Receive_IT(&hspi1, (uint8_t*)(spi_rx_data + spi_rx_data_index), 1);
 	HAL_NVIC_DisableIRQ(EXTI0_1_IRQn);
 //	init_mode_pin();
 	
