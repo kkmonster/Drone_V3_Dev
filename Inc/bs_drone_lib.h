@@ -462,27 +462,11 @@ void Drive_motor_output(void)
 	//motor_B = 100 ;
 	//motor_C = 100 ;
 	//motor_D = 100 ;
-	
-	// limmit output max, min
-	if(motor_A < 0) motor_A = 0 ;
-	if(motor_B < 0) motor_B = 0 ;
-	if(motor_C < 0) motor_C = 0 ;
-	if(motor_D < 0) motor_D = 0 ;
-	
-	if(motor_A > 2399) motor_A = 2399 ;
-	if(motor_B > 2399) motor_B = 2399 ;
-	if(motor_C > 2399) motor_C = 2399 ;
-	if(motor_D > 2399) motor_D = 2399 ;
-	
-	TIM2->CCR1 = motor_C ;
-	TIM2->CCR2 = motor_D ;
-	TIM3->CCR1 = motor_A ;
-	TIM3->CCR2 = motor_B ;
 
-//	TIM2->CCR1 = constrain(motor_C, 0, 2399);
-//	TIM2->CCR2 = constrain(motor_D, 0, 2399);
-//	TIM3->CCR1 = constrain(motor_A, 0, 2399);
-//	TIM3->CCR2 = constrain(motor_B, 0, 2399);
+	TIM2->CCR1 = constrain(motor_C, 0, 2399);
+	TIM2->CCR2 = constrain(motor_D, 0, 2399);
+	TIM3->CCR1 = constrain(motor_A, 0, 2399);
+	TIM3->CCR2 = constrain(motor_B, 0, 2399);
 }
 
 void AHRS(void)
