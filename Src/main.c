@@ -242,11 +242,12 @@ int main(void)
   /* USER CODE BEGIN 2 */
 	HAL_SPI_Receive_IT(&hspi1, (uint8_t*)(spi_rx_data + spi_rx_data_index), 1);
 	HAL_NVIC_DisableIRQ(EXTI0_1_IRQn);
-//	init_mode_pin();
+	
+	init_mode_pin();
 	
 	HAL_Delay(300);
 
-	if (HAL_GPIO_ReadPin(Pin_0_GPIO_Port, Pin_0_Pin) == GPIO_PIN_RESET)  // go to "USB TO SERIAL" mode
+	if (HAL_GPIO_ReadPin(Pin_0_GPIO_Port, Pin_0_Pin) == GPIO_PIN_RESET || HAL_GPIO_ReadPin(GPIOA, GPIO_PIN_14) == GPIO_PIN_RESET)  // go to "USB TO SERIAL" mode
 	{
 		//MX_USART1_UART_Init();
 		
@@ -562,7 +563,7 @@ static void MX_TIM17_Init(void)
   htim17.Instance = TIM17;
   htim17.Init.Prescaler = 479;
   htim17.Init.CounterMode = TIM_COUNTERMODE_UP;
-  htim17.Init.Period = 99;
+  htim17.Init.Period = 49;
   htim17.Init.ClockDivision = TIM_CLOCKDIVISION_DIV1;
   htim17.Init.RepetitionCounter = 0;
   if (HAL_TIM_Base_Init(&htim17) != HAL_OK)
