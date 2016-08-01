@@ -78,13 +78,13 @@ volatile float T_center_minus = 0;
 volatile float y_roll=0, y_pitch=0, y0_roll=0, y0_pitch=0 ; 
 volatile float rMat[3][3] = {0};
 
-volatile float Kp_roll = 0;
-volatile float Ki_roll = 0;
-volatile float Kd_roll = 0;
+volatile float Kp_roll = 13.75;
+volatile float Ki_roll = 5;
+volatile float Kd_roll = 9;
 
-volatile float Kp_pitch = 0;
-volatile float Ki_pitch = 0;
-volatile float Kd_pitch = 0;
+volatile float Kp_pitch = 13.75;
+volatile float Ki_pitch = 5;
+volatile float Kd_pitch = 9;
 
 volatile float Kp_yaw = 6;
 volatile float Ki_yaw = 1;
