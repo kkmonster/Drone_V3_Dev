@@ -78,16 +78,16 @@ volatile float T_center_minus = 0;
 volatile float y_roll=0, y_pitch=0, y0_roll=0, y0_pitch=0 ; 
 volatile float rMat[3][3] = {0};
 
-volatile float Kp_roll = 13.75;
-volatile float Ki_roll = 5;
-volatile float Kd_roll = 9;
+volatile float Kp_roll = 28;
+volatile float Ki_roll = 7.5;
+volatile float Kd_roll = 11.25;
 
-volatile float Kp_pitch = 13.75;
-volatile float Ki_pitch = 5;
-volatile float Kd_pitch = 9;
+volatile float Kp_pitch = 128;
+volatile float Ki_pitch = 7.5;
+volatile float Kd_pitch = 11.25;
 
-volatile float Kp_yaw = 6;
-volatile float Ki_yaw = 1;
+volatile float Kp_yaw = 12.75;
+volatile float Ki_yaw = 5;
 volatile float Kd_yaw = 0;
 
 volatile float Kp_flip = 0;
@@ -133,6 +133,9 @@ float _acx_d = INT16_MAX;
 float _acy_d = INT16_MAX;
 int16_t count;
 
+float x_position, y_position, z_position, thata, alpha, gramma;
+
+
 void Function1_call(void);
 void Function2_call(void);
 
@@ -160,6 +163,9 @@ void calibation_fn(void);
 void stabilize_fn(void);
 float Butterworth_filter(filted_data* filted, float x_data);
 void SET_filter_value(filted_data *filted, float value);
+void PD_position_control(uint8_t spi_rx_data_index);
+
+
 
 void Sampling_task(void)
 {
@@ -609,26 +615,26 @@ void getPIDgain(uint8_t spi_rx_data_index)
 
 	if (checksum_buffer == sum)
 	{
-		Kp_roll = (float)Kp_roll_tmp * 0.050f;
-		Ki_roll = (float)Ki_roll_tmp * 0.025f;
-		Kd_roll = (float)Kd_roll_tmp * 0.025f;
+		Kp_roll = (float)Kp_roll_tmp * 0.050f;    //	560 28
+		Ki_roll = (float)Ki_roll_tmp * 0.025f;    //	30	7.5
+		Kd_roll = (float)Kd_roll_tmp * 0.025f;    //	450	11.25
 
-		Kp_pitch = (float)Kp_pitch_tmp * 0.050f;
-		Ki_pitch = (float)Ki_pitch_tmp * 0.025f;
-		Kd_pitch = (float)Kd_pitch_tmp * 0.025f;
+		Kp_pitch = (float)Kp_pitch_tmp * 0.050f;    //	560
+		Ki_pitch = (float)Ki_pitch_tmp * 0.025f;    //	210
+		Kd_pitch = (float)Kd_pitch_tmp * 0.025f;    //	450
 
 //		Kp_yaw = (float)Kp_yaw_tmp * 0.025f;
 //		Ki_yaw = (float)Ki_yaw_tmp * 0.025f;
 //		Kd_yaw = (float)Kd_yaw_tmp * 0.020f;
 
-		Kp_flip = (float)Kp_yaw_tmp * 0.060f;
-		Kd_flip = (float)Kd_yaw_tmp * 0.020f;
-		flip_Jump_time = Ki_yaw_tmp;
+//		Kp_flip = (float)Kp_yaw_tmp * 0.060f;
+//		Kd_flip = (float)Kd_yaw_tmp * 0.020f;
+//		flip_Jump_time = Ki_yaw_tmp;
 		
 		if (Kd_yaw_tmp < 1)
 		{
-			Kp_yaw = (float)Kp_yaw_tmp * 0.025f;
-			Ki_yaw = (float)Ki_yaw_tmp * 0.025f;
+			Kp_yaw = (float)Kp_yaw_tmp * 0.025f;    //	510	12.75
+			Ki_yaw = (float)Ki_yaw_tmp * 0.025f;    //	200	5
 			Kd_yaw = (float)Kd_yaw_tmp * 0.020f;
 			
 		} else {
@@ -716,7 +722,8 @@ void HAL_SPI_RxCpltCallback(SPI_HandleTypeDef *hspi)
 	spi_rx_data_index = spi_rx_data_index + 1;	
 	
 	if (spi_rx_data_index >= 2)
-	{		
+	{	
+
 		/*----------------------------------FUNCTION-----------------------------------*/
 		command_code = 0xf1 ;
 		if (spi_rx_data[spi_rx_data_index-2] == command_code && spi_rx_data[spi_rx_data_index-1] == command_code )
@@ -760,6 +767,24 @@ void HAL_SPI_RxCpltCallback(SPI_HandleTypeDef *hspi)
 					getPIDgain(spi_rx_data_index-1);
 					spi_rx_data_index = 0;
 				} 
+			}
+			
+			if(spi_rx_data_index >= 15)
+			{	
+				command_code = 0x61 ;
+				if (spi_rx_data[spi_rx_data_index-14] == command_code && spi_rx_data[spi_rx_data_index-13] == command_code )
+				{					
+//					uint8_t sum = 0;
+//					for(int x = 0; x < 12; x++)
+//					{
+//						sum += (uint8_t)spi_rx_data[spi_rx_data_index-12+x];
+//					}
+//					if(sum == sum2)
+//					{
+						PD_position_control(spi_rx_data_index-12);
+//					}		
+					spi_rx_data_index = 0;
+				}		
 			}
 		}
 	}
@@ -817,4 +842,26 @@ void SET_filter_value(filted_data *filted, float value)
 	filted->X1 = value;
 
 }
+
+void PD_position_control(uint8_t spi_rx_data_index)
+{
+  int16_t	x_position_tmp = (int16_t)spi_rx_data[spi_rx_data_index+0]<<8 | (int16_t)spi_rx_data[spi_rx_data_index+1];
+	int16_t	y_position_tmp = (int16_t)spi_rx_data[spi_rx_data_index+2]<<8 | (int16_t)spi_rx_data[spi_rx_data_index+3];
+	int16_t	z_position_tmp = (int16_t)spi_rx_data[spi_rx_data_index+4]<<8 | (int16_t)spi_rx_data[spi_rx_data_index+5];
+
+	int16_t	thata_tmp = (int16_t)spi_rx_data[spi_rx_data_index+6]<<8 | (int16_t)spi_rx_data[spi_rx_data_index+7];
+	int16_t	alpha_tmp = (int16_t)spi_rx_data[spi_rx_data_index+8]<<8 | (int16_t)spi_rx_data[spi_rx_data_index+9];
+	int16_t	gramma_tmp =(int16_t)spi_rx_data[spi_rx_data_index+10]<<8 | (int16_t)spi_rx_data[spi_rx_data_index+11];
+	
+	x_position = x_position_tmp;
+	y_position = y_position_tmp;
+	z_position = z_position_tmp;
+	
+	thata  = (float)thata_tmp*0.001f;
+	alpha  = (float)alpha_tmp*0.001f;
+	gramma = (float)gramma_tmp*0.001f;
+	
+}
+
+
 #endif

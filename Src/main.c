@@ -243,30 +243,30 @@ int main(void)
 	HAL_SPI_Receive_IT(&hspi1, (uint8_t*)(spi_rx_data + spi_rx_data_index), 1);
 	HAL_NVIC_DisableIRQ(EXTI0_1_IRQn);
 	
-	init_mode_pin();
-	
-	HAL_Delay(300);
+//	init_mode_pin();
+//	
+//	HAL_Delay(300);
 
-	if (HAL_GPIO_ReadPin(Pin_0_GPIO_Port, Pin_0_Pin) == GPIO_PIN_RESET || HAL_GPIO_ReadPin(GPIOA, GPIO_PIN_14) == GPIO_PIN_RESET)  // go to "USB TO SERIAL" mode
-	{
-		//MX_USART1_UART_Init();
+//	if (HAL_GPIO_ReadPin(Pin_0_GPIO_Port, Pin_0_Pin) == GPIO_PIN_RESET || HAL_GPIO_ReadPin(GPIOA, GPIO_PIN_14) == GPIO_PIN_RESET)  // go to "USB TO SERIAL" mode
+//	{
+//		//MX_USART1_UART_Init();
+//		
+//		MX_USB_DEVICE_Init();
+//		
+//		MX_TIM17_Init();
+//		HAL_NVIC_SetPriority(TIM17_IRQn, 2, 0);
+//		HAL_NVIC_EnableIRQ(TIM17_IRQn);
+//		
+//		HAL_TIM_Base_Start_IT(&htim17);
+//		
+//		while (1)
+//		{
+//			HAL_Delay(5);
+//			LED_L_off();
+//			LED_R_off();
+//		}
 		
-		MX_USB_DEVICE_Init();
-		
-		MX_TIM17_Init();
-		HAL_NVIC_SetPriority(TIM17_IRQn, 2, 0);
-		HAL_NVIC_EnableIRQ(TIM17_IRQn);
-		
-		HAL_TIM_Base_Start_IT(&htim17);
-		
-		while (1)
-		{
-			HAL_Delay(5);
-			LED_L_off();
-			LED_R_off();
-		}
-		
-	}else{  // go to "drone" mode
+//	}else{  // go to "drone" mode
 	
 		HAL_TIM_PWM_Start(&htim2,TIM_CHANNEL_1);
 		HAL_TIM_PWM_Start(&htim2,TIM_CHANNEL_2);
@@ -277,7 +277,7 @@ int main(void)
 				
 		HAL_Delay(10);
 		HAL_NVIC_EnableIRQ(EXTI0_1_IRQn);
-	}
+//	}
 	
   /* USER CODE END 2 */
 
