@@ -31,6 +31,7 @@
 #define LED_L_off() HAL_GPIO_WritePin(LED_L_GPIO_Port, LED_L_Pin, GPIO_PIN_RESET)
 
 #define ARM_MATH_CM0
+#define PI 
 
 #include "stm32f0xx_hal.h"
 #include "usb_device.h"
@@ -40,7 +41,7 @@
 #include "usbd_cdc_if.h"
 
 volatile uint8_t _Sampling_task_do = 0;
-
+volatile uint8_t _position_task_do = 0;
 volatile uint8_t Mode = calibation_mode;
 
 int16_t rawAccx_X = 1;
@@ -163,8 +164,8 @@ void calibation_fn(void);
 void stabilize_fn(void);
 float Butterworth_filter(filted_data* filted, float x_data);
 void SET_filter_value(filted_data *filted, float value);
-void PD_position_control(uint8_t spi_rx_data_index);
-
+void PD_position_control_state(uint8_t spi_rx_data_index);
+void PD_position_control(void);
 
 
 void Sampling_task(void)
@@ -708,6 +709,9 @@ float abs_user(float x)
 	return x;
 }
 
+int8_t sum, sum2;
+
+
 void HAL_SPI_RxCpltCallback(SPI_HandleTypeDef *hspi)
 {
 	static uint8_t count, command_code;
@@ -769,20 +773,21 @@ void HAL_SPI_RxCpltCallback(SPI_HandleTypeDef *hspi)
 				} 
 			}
 			
-			if(spi_rx_data_index >= 15)
+			if(spi_rx_data_index >= 16)
 			{	
 				command_code = 0x61 ;
-				if (spi_rx_data[spi_rx_data_index-14] == command_code && spi_rx_data[spi_rx_data_index-13] == command_code )
+				if (spi_rx_data[spi_rx_data_index-15] == command_code && spi_rx_data[spi_rx_data_index-14] == command_code )
 				{					
-//					uint8_t sum = 0;
-//					for(int x = 0; x < 12; x++)
-//					{
-//						sum += (uint8_t)spi_rx_data[spi_rx_data_index-12+x];
-//					}
-//					if(sum == sum2)
-//					{
-						PD_position_control(spi_rx_data_index-12);
-//					}		
+					sum = 0;
+					sum2 = spi_rx_data[spi_rx_data_index-1];
+					for(int x = 0; x < 12; x++)
+					{
+						sum += (int8_t)spi_rx_data[spi_rx_data_index-13+x];
+					}
+					if(sum == sum2)
+					{
+						PD_position_control_state(spi_rx_data_index-13);
+					}		
 					spi_rx_data_index = 0;
 				}		
 			}
@@ -843,7 +848,7 @@ void SET_filter_value(filted_data *filted, float value)
 
 }
 
-void PD_position_control(uint8_t spi_rx_data_index)
+void PD_position_control_state(uint8_t spi_rx_data_index)
 {
   int16_t	x_position_tmp = (int16_t)spi_rx_data[spi_rx_data_index+0]<<8 | (int16_t)spi_rx_data[spi_rx_data_index+1];
 	int16_t	y_position_tmp = (int16_t)spi_rx_data[spi_rx_data_index+2]<<8 | (int16_t)spi_rx_data[spi_rx_data_index+3];
@@ -855,12 +860,13 @@ void PD_position_control(uint8_t spi_rx_data_index)
 	
 	x_position = x_position_tmp;
 	y_position = y_position_tmp;
-	z_position = z_position_tmp;
+	z_position = -z_position_tmp;
 	
 	thata  = (float)thata_tmp*0.001f;
 	alpha  = (float)alpha_tmp*0.001f;
 	gramma = (float)gramma_tmp*0.001f;
 	
+	_position_task_do = 1;
 }
 
 
