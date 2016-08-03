@@ -31,7 +31,6 @@
 #define LED_L_off() HAL_GPIO_WritePin(LED_L_GPIO_Port, LED_L_Pin, GPIO_PIN_RESET)
 
 #define ARM_MATH_CM0
-#define PI 
 
 #include "stm32f0xx_hal.h"
 #include "usb_device.h"
@@ -80,15 +79,15 @@ volatile float y_roll=0, y_pitch=0, y0_roll=0, y0_pitch=0 ;
 volatile float rMat[3][3] = {0};
 
 volatile float Kp_roll = 28;
-volatile float Ki_roll = 7.5;
+volatile float Ki_roll = 0;//7.5;
 volatile float Kd_roll = 11.25;
 
 volatile float Kp_pitch = 128;
-volatile float Ki_pitch = 7.5;
+volatile float Ki_pitch = 0;//7.5;
 volatile float Kd_pitch = 11.25;
 
 volatile float Kp_yaw = 12.75;
-volatile float Ki_yaw = 5;
+volatile float Ki_yaw = 0;//5;
 volatile float Kd_yaw = 0;
 
 volatile float Kp_flip = 0;
@@ -787,6 +786,7 @@ void HAL_SPI_RxCpltCallback(SPI_HandleTypeDef *hspi)
 					if(sum == sum2)
 					{
 						PD_position_control_state(spi_rx_data_index-13);
+						watchdog = 500;
 					}		
 					spi_rx_data_index = 0;
 				}		

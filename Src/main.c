@@ -87,6 +87,7 @@ void MatrixMultiply(float *A, float *B, float *C);
 void RotateFill(float *A, float xAngle, float yAngle, float zAngle);
 
 #include "bs_drone_lib.h"
+
 /* USER CODE END PV */ 
 
 /* Private function prototypes -----------------------------------------------*/
@@ -118,27 +119,47 @@ void PID_calulate(PID_state* tmp){
 		tmp->time_prev = time_now;
 		
 		tmp->error_prev = tmp->error;
-		tmp->error = tmp->ref - tmp->state;
+		tmp->error = -tmp->ref + tmp->state;
 		tmp->error_dot = (tmp->error - tmp->error_prev)*((float)dt*0.001f);
 		tmp->error_sum = constrain(tmp->error_sum + (tmp->error*((float)dt*0.001f)),-100,100);
 		
-		tmp->output = (tmp->kp * tmp->error) + (tmp->kd * tmp->error_dot) + (tmp->ki * tmp->error_sum);
+		tmp->output = constrain((tmp->kp * tmp->error) + (tmp->kd * tmp->error_dot) + (tmp->ki * tmp->error_sum),-50,50);
 
 	}else{
 		tmp->time_prev  = HAL_GetTick();
 	}
 }
+void PID_calulate_Y(PID_state* tmp){
 
+	if(tmp->time_prev != 0)
+	{
+		uint32_t time_now =  HAL_GetTick();
+		uint32_t dt =  time_now - tmp->time_prev;
+		
+		tmp->time_prev = time_now;
+		
+		tmp->error_prev = tmp->error;
+		tmp->error = -tmp->ref + tmp->state;
+		tmp->error_dot = (tmp->error - tmp->error_prev)*((float)dt*0.001f);
+		tmp->error_sum = constrain(tmp->error_sum + (tmp->error*((float)dt*0.0005f)),0,500);
+		
+		tmp->output = constrain((tmp->kp * tmp->error) + (tmp->kd * tmp->error_dot) + (tmp->ki * tmp->error_sum),0,100);
+
+	}else{
+		tmp->time_prev  = HAL_GetTick();
+	}
+}
 /* USER CODE END PFP */
 
 /* USER CODE BEGIN 0 */
 
-const float target_position[] = {0,0,100};  //x y z
+const float target_position[] = {0,0,400};  //x y z
 
 PID_state x_posi,y_posi,z_posi,yaw_posi; 
 static float ab_target_position[9];
 static float relative_target_position[9];  //x y z
-float rotation_matrix[9];
+static float rotation_matrix[9];
+static float Yaw_command;
 
 void PD_position_control(void)
 {
@@ -149,20 +170,27 @@ void PD_position_control(void)
 	
 	relative_target_position[0] =  target_position[2]*thata;
 	relative_target_position[4] =  target_position[2]*alpha;
-	relative_target_position[8] =  -target_position[2]*gramma;
+	relative_target_position[8] =  target_position[2]*gramma;
 	
-	relative_target_position[0] = Smooth_filter(0.7, x_position + relative_target_position[0], relative_target_position[0]);
-	relative_target_position[4] = Smooth_filter(0.7, y_position + relative_target_position[4], relative_target_position[4]);
-	relative_target_position[8] = Smooth_filter(0.7, z_position + relative_target_position[8], relative_target_position[8]);
+	Yaw_command = Smooth_filter(0.6, x_position, Yaw_command);
+	
+	relative_target_position[0] = Smooth_filter(0.6, x_position + relative_target_position[0], relative_target_position[0]);
+	relative_target_position[4] = Smooth_filter(0.6, y_position + relative_target_position[4], relative_target_position[4]);
+	relative_target_position[8] = Smooth_filter(0.6, z_position - relative_target_position[8], relative_target_position[8]);
 		
 	RotateFill(rotation_matrix, (float)q_pitch*0.1f, (float)q_roll*0.1f, 0);
 	MatrixMultiply(rotation_matrix, relative_target_position, ab_target_position);
- a= relative_target_position[0];
- b= relative_target_position[4];
- c=	relative_target_position[8];
-	ab_target_position[0] = Smooth_filter(0.7,ab_target_position[0], ab_target_position[0]);
-	ab_target_position[4] = Smooth_filter(0.7,ab_target_position[4], ab_target_position[4]);
-	ab_target_position[8] = Smooth_filter(0.7,ab_target_position[8], ab_target_position[8]);
+	
+	a = relative_target_position[0];
+	b = relative_target_position[4];
+	c = relative_target_position[8];
+	d = ab_target_position[0];
+	e = ab_target_position[4];
+	f = ab_target_position[8];
+	
+	ab_target_position[0] = Smooth_filter(0.6,ab_target_position[0], ab_target_position[0]);
+	ab_target_position[4] = Smooth_filter(0.6,ab_target_position[4], ab_target_position[4]);
+	ab_target_position[8] = Smooth_filter(0.6,ab_target_position[8], ab_target_position[8]);
 	
 //	x_position = x_position_tmp;
 //	y_position = y_position_tmp;
@@ -177,19 +205,19 @@ void PD_position_control(void)
 	x_posi.state =  ab_target_position[0];
 	y_posi.state =  ab_target_position[4];
 	z_posi.state =  ab_target_position[8];
-	yaw_posi.state =  relative_target_position[0]  ;
+	yaw_posi.state =  Yaw_command;
 	
 	/* calibation PID    */
 	PID_calulate(&x_posi);
-	PID_calulate(&y_posi);
+	PID_calulate_Y(&y_posi);
 	PID_calulate(&z_posi);	
 	PID_calulate(&yaw_posi);
 	
 	/* write PID  output */
-//	ch1 = x_posi.output;
-//  ch2 =	y_posi.output;
-//	ch3 =	z_posi.output;
-//  ch4 =	yaw_posi.output;
+	ch1 = x_posi.output;
+  ch3 =	y_posi.output;
+	ch2 =	z_posi.output;
+  ch4 =	yaw_posi.output;
 }
 
 void Function1_call(void)
@@ -309,6 +337,26 @@ int main(void)
 
   /* USER CODE BEGIN 1 */
 
+	x_posi.kp = 0.10;
+	x_posi.ki = 0;
+	x_posi.kd = 0.14;
+
+	z_posi.ref = 440;
+	 
+	z_posi.kp = x_posi.kp;
+	z_posi.ki = 0;
+	z_posi.kd = x_posi.kd;
+
+	y_posi.kp = 0.1;
+	y_posi.ki = 0.2;
+	y_posi.kd = 0.14;
+
+	//////////////////////////////////////
+	 
+	yaw_posi.kp = 0.2;
+	yaw_posi.ki = 0.01;
+	yaw_posi.kd = 0;
+	 
   /* USER CODE END 1 */
 
   /* MCU Configuration----------------------------------------------------------*/
@@ -766,38 +814,58 @@ void RotateFill(float *A, float xAngle, float yAngle, float zAngle)
 {
    /* Fill the rotation matrix, using Euler angles */
 
-   float x[9];
-   float y[9];
-   float z[9];
-   float tempArray[9];
-   float cx,cy,cz;
-   float sx,sy,sz;
+		float x[9];
+		float y[9];
+		float z[9];
+		float tempArray[9];
+		float cx,cy,cz;
+		float sx,sy,sz;
 
-   cx = cosf(xAngle*M_PIf/180.0f);
-   cy = cosf(yAngle*M_PIf/180.0f);
-   cz = cosf(zAngle*M_PIf/180.0f);
+		cx = cosf(xAngle*M_PIf/180.0f);
+		cy = cosf(yAngle*M_PIf/180.0f);
+		cz = cosf(zAngle*M_PIf/180.0f);
 
-   sx = sinf(xAngle*M_PIf/180.0f);
-   sy = sinf(yAngle*M_PIf/180.0f);
-   sz = sinf(zAngle*M_PIf/180.0f);
+		sx = sinf(xAngle*M_PIf/180.0f);
+		sy = sinf(yAngle*M_PIf/180.0f);
+		sz = sinf(zAngle*M_PIf/180.0f);
 
-   x[0]=1;     x[1]=0;     x[2]=0;     
-   x[3]=0;     x[4]=cx;    x[5]=-sx;   
-   x[6]=0;     x[7]=sx;    x[8]=cx;    
+		A[0] = cz*cy;
+		A[1] = cz*sy*sx- sz*cx; 
+		A[2] = cz*sy*cx+sz*sx;
+		A[3] = sz*cy;
+		A[4] = sz*sy*sx+cz*cx;
+		A[5] = sz*sy*cx-cz*sx;
+		A[6] = -sy;
+		A[7] = cy*sx;
+		A[8] = cy*cx;
+	
+//   x[0]=1;     x[1]=0;     x[2]=0;     
+//   x[3]=0;     x[4]=cx;    x[5]=-sx;   
+//   x[6]=0;     x[7]=sx;    x[8]=cx;    
 
-   y[0]=cy;    y[1]=0;     y[2]=sy;    
-   y[3]=0;     y[4]=1;     y[5]=0;     
-   y[6]=-sy;   y[7]=0;     y[8]=cy;    
+//   y[0]=cy;    y[1]=0;     y[2]=sy;    
+//   y[3]=0;     y[4]=1;     y[5]=0;     
+//   y[6]=-sy;   y[7]=0;     y[8]=cy;    
 
-   z[0]=cz;    z[1]=-sz;   z[2]=0;     
-   z[3]=sz;    z[4]=cz;    z[5]=0;     
-   z[6]=0;     z[7]=0;     z[8]=1;     
+//   z[0]=cz;    z[1]=-sz;   z[2]=0;     
+//   z[3]=sz;    z[4]=cz;    z[5]=0;     
+//   z[6]=0;     z[7]=0;     z[8]=1;     
+	 
+//	rot[0][0] = cos(yaw/180.0*PI)*cos(pitch/180.0*PI);
+//	rot[1][0] = cos(yaw/180.0*PI)*sin(pitch/180.0*PI)*sin(roll/180.0*PI)- sin(pitch/180.0*PI)*cos(roll/180.0*PI); 
+//	rot[2][0] = cos(pitch/180.0*PI)*sin(yaw/180.0*PI)*cos(pitch/180.0*PI)+sin(yaw/180.0*PI)*cos(roll/180.0*PI);
+//	rot[0][1] = sin(yaw/180.0*PI)*cos(pitch/180.0*PI);
+//	rot[1][1] = sin(yaw/180.0*PI)*sin(pitch/180.0*PI)*sin(roll/180.0*PI)+cos(yaw/180.0*PI)*cos(roll/180.0*PI);
+//	rot[2][1] = sin(yaw/180.0*PI)*sin(pitch/180.0*PI)*cos(roll/180.0*PI)-cos(yaw/180.0*PI)*sin(roll/180.0*PI);
+//	rot[0][2] = -sin(pitch/180.0*PI);
+//	rot[1][2] = cos(pitch/180.0*PI)*sin(roll/180.0*PI);
+//	rot[2][2] = cos(pitch/180.0*PI)*cos(roll/180.0*PI);
 
    /* Note we are multiplying x*y*z. You can change the order,
       but you will get different results. */
 
-   MatrixMultiply(z,y,tempArray);   // multiply 2 matrices
-   MatrixMultiply(tempArray,x,A);   // multiply result by 3rd matrix
+//  MatrixMultiply(z,y,tempArray);   // multiply 2 matrices
+//   MatrixMultiply(tempArray,x,A);   // multiply result by 3rd matrix
 }
 
 void MatrixMultiply(float *A, float *B, float *C)
