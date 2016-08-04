@@ -175,10 +175,10 @@ void PD_position_control(void)
 	Yaw_command = Smooth_filter(0.4, x_position, Yaw_command);
 	
 	relative_target_position[0] = Smooth_filter(0.6, x_position + relative_target_position[0], relative_target_position[0]);
-	relative_target_position[1] = Smooth_filter(0.6, y_position + relative_target_position[4], relative_target_position[4]);
-	relative_target_position[2] = Smooth_filter(0.6, z_position - relative_target_position[8], relative_target_position[8]);
+	relative_target_position[1] = Smooth_filter(0.6, y_position + relative_target_position[1], relative_target_position[1]);
+	relative_target_position[2] = Smooth_filter(0.6, z_position - relative_target_position[2], relative_target_position[2]);
 		
-	//RotateFill(rotation_matrix, (float)q_pitch*-0.1f, (float)q_roll*-0.1f, 0);
+	RotateFill(rotation_matrix, (float)q_pitch*-0.1f, (float)q_roll*-0.1f, 0);
 	MatrixMultiply(rotation_matrix, relative_target_position, ab_target_position);
 	
 	a = relative_target_position[0];
@@ -203,8 +203,8 @@ void PD_position_control(void)
 	// rotation matrix
 	
 	x_posi.state =  ab_target_position[0];
-	y_posi.state =  ab_target_position[4];
-	z_posi.state =  ab_target_position[8];
+	y_posi.state =  ab_target_position[1];
+	z_posi.state =  ab_target_position[2];
 	yaw_posi.state =  Yaw_command;
 	
 	/* calibation PID    */
