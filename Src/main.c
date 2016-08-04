@@ -94,7 +94,7 @@ void RotateFill(float *A, float xAngle, float yAngle, float zAngle);
 void SystemClock_Config(void);
 void Error_Handler(void);
 static void MX_GPIO_Init(void);
-static void MX_DMA_Init(void);
+static void MX_DMA_Init(void);\
 static void MX_I2C1_Init(void);
 static void MX_SPI1_Init(void);
 static void MX_TIM2_Init(void);
@@ -156,8 +156,8 @@ void PID_calulate_Y(PID_state* tmp){
 const float target_position[] = {0,0,400};  //x y z
 
 PID_state x_posi,y_posi,z_posi,yaw_posi; 
-static float ab_target_position[9];
-static float relative_target_position[9];  //x y z
+static float ab_target_position[3];
+static float relative_target_position[3];  //x y z
 static float rotation_matrix[9];
 static float Yaw_command;
 
@@ -169,28 +169,28 @@ void PD_position_control(void)
 //	static float relative_target_position[9];  //x y z
 	
 	relative_target_position[0] =  target_position[2]*thata;
-	relative_target_position[4] =  target_position[2]*alpha;
-	relative_target_position[8] =  target_position[2]*gramma;
+	relative_target_position[1] =  target_position[2]*alpha;
+	relative_target_position[2] =  target_position[2]*gramma;
 	
-	Yaw_command = Smooth_filter(0.6, x_position, Yaw_command);
+	Yaw_command = Smooth_filter(0.4, x_position, Yaw_command);
 	
 	relative_target_position[0] = Smooth_filter(0.6, x_position + relative_target_position[0], relative_target_position[0]);
-	relative_target_position[4] = Smooth_filter(0.6, y_position + relative_target_position[4], relative_target_position[4]);
-	relative_target_position[8] = Smooth_filter(0.6, z_position - relative_target_position[8], relative_target_position[8]);
+	relative_target_position[1] = Smooth_filter(0.6, y_position + relative_target_position[4], relative_target_position[4]);
+	relative_target_position[2] = Smooth_filter(0.6, z_position - relative_target_position[8], relative_target_position[8]);
 		
-	RotateFill(rotation_matrix, (float)q_pitch*0.1f, (float)q_roll*0.1f, 0);
+	//RotateFill(rotation_matrix, (float)q_pitch*-0.1f, (float)q_roll*-0.1f, 0);
 	MatrixMultiply(rotation_matrix, relative_target_position, ab_target_position);
 	
 	a = relative_target_position[0];
-	b = relative_target_position[4];
-	c = relative_target_position[8];
+	b = relative_target_position[1];
+	c = relative_target_position[2];
 	d = ab_target_position[0];
-	e = ab_target_position[4];
-	f = ab_target_position[8];
+	e = ab_target_position[1];
+	f = ab_target_position[2];
 	
 	ab_target_position[0] = Smooth_filter(0.6,ab_target_position[0], ab_target_position[0]);
-	ab_target_position[4] = Smooth_filter(0.6,ab_target_position[4], ab_target_position[4]);
-	ab_target_position[8] = Smooth_filter(0.6,ab_target_position[8], ab_target_position[8]);
+	ab_target_position[1] = Smooth_filter(0.6,ab_target_position[1], ab_target_position[1]);
+	ab_target_position[2] = Smooth_filter(0.6,ab_target_position[2], ab_target_position[2]);
 	
 //	x_position = x_position_tmp;
 //	y_position = y_position_tmp;
@@ -830,7 +830,7 @@ void RotateFill(float *A, float xAngle, float yAngle, float zAngle)
 		sz = sinf(zAngle*M_PIf/180.0f);
 
 		A[0] = cz*cy;
-		A[1] = cz*sy*sx- sz*cx; 
+		A[1] = cz*sy*sx-sz*cx; 
 		A[2] = cz*sy*cx+sz*sx;
 		A[3] = sz*cy;
 		A[4] = sz*sy*sx+cz*cx;
@@ -872,19 +872,9 @@ void MatrixMultiply(float *A, float *B, float *C)
 {
    /* A matrix multiplication (dot product) of two 3x3 matrices. */
 
-   C[0] = A[0]*B[0] + A[1]*B[3] + A[2]*B[6];
-   C[1] = A[0]*B[1] + A[1]*B[4] + A[2]*B[7];
-   C[2] = A[0]*B[2] + A[1]*B[5] + A[2]*B[8];
-
-
-   C[3] = A[3]*B[0] + A[4]*B[3] + A[5]*B[6];
-   C[4] = A[3]*B[1] + A[4]*B[4] + A[5]*B[7];
-   C[5] = A[3]*B[2] + A[4]*B[5] + A[5]*B[8];
-
-
-   C[6] = A[6]*B[0] + A[7]*B[3] + A[8]*B[6];
-   C[7] = A[6]*B[1] + A[7]*B[4] + A[8]*B[7];
-   C[8] = A[6]*B[2] + A[7]*B[5] + A[8]*B[8];
+   C[0] = A[0]*B[0] + A[1]*B[1] + A[2]*B[2];
+   C[1] = A[3]*B[0] + A[4]*B[1] + A[5]*B[2];
+   C[2] = A[6]*B[0] + A[7]*B[1] + A[8]*B[2];
 
 }
 /* USER CODE END 4 */
