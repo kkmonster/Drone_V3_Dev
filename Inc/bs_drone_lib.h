@@ -708,7 +708,7 @@ float abs_user(float x)
 	return x;
 }
 
-int8_t sum, sum2;
+int8_t sum, sum2, sum_prev;
 
 
 void HAL_SPI_RxCpltCallback(SPI_HandleTypeDef *hspi)
@@ -776,17 +776,19 @@ void HAL_SPI_RxCpltCallback(SPI_HandleTypeDef *hspi)
 			{	
 				command_code = 0x61 ;
 				if (spi_rx_data[spi_rx_data_index-15] == command_code && spi_rx_data[spi_rx_data_index-14] == command_code )
-				{					
+				{					 
+					
 					sum = 0;
 					sum2 = spi_rx_data[spi_rx_data_index-1];
 					for(int x = 0; x < 12; x++)
 					{
 						sum += (int8_t)spi_rx_data[spi_rx_data_index-13+x];
 					}
-					if(sum == sum2)
+					if(sum == sum2 && sum2 != sum_prev)
 					{
+						sum_prev = sum2;
 						PD_position_control_state(spi_rx_data_index-13);
-						watchdog = 500;
+						watchdog = 200;
 					}		
 					spi_rx_data_index = 0;
 				}		
