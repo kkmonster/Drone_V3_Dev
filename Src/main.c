@@ -120,17 +120,18 @@ void PID_calulate(PID_state* tmp){
 		
 		tmp->error_prev = tmp->error;
 		tmp->error = -tmp->ref + tmp->state;
-		tmp->error_dot = (tmp->error - tmp->error_prev)*((float)dt*0.001f);
+		tmp->error_dot = (tmp->error - tmp->error_prev)/((float)dt*0.01f);
 		tmp->error_sum = constrain(tmp->error_sum + (tmp->error*((float)dt*0.001f)),-100,100);
 		
-		tmp->output = constrain((tmp->kp * tmp->error) + (tmp->kd * tmp->error_dot) + (tmp->ki * tmp->error_sum),-50,50);
+		tmp->output = constrain((tmp->kp * tmp->error) + (tmp->kd * tmp->error_dot) + (tmp->ki * tmp->error_sum),-30,30);
 
 	}else{
 		tmp->time_prev  = HAL_GetTick();
 	}
 }
 void PID_calulate_Y(PID_state* tmp){
-
+	
+	uint8_t garvitycompensation = 0;
 	if(tmp->time_prev != 0)
 	{
 		uint32_t time_now =  HAL_GetTick();
@@ -140,10 +141,11 @@ void PID_calulate_Y(PID_state* tmp){
 		
 		tmp->error_prev = tmp->error;
 		tmp->error = -tmp->ref + tmp->state;
-		tmp->error_dot = (tmp->error - tmp->error_prev)*((float)dt*0.001f);
-		tmp->error_sum = constrain(tmp->error_sum + (tmp->error*((float)dt*0.0005f)),0,500);
+		tmp->error_dot = (tmp->error - tmp->error_prev)/((float)dt*0.01f);
+		tmp->error_sum = constrain(tmp->error_sum + (tmp->error*((float)dt*0.00017f)),0,500);
 		
-		tmp->output = constrain((tmp->kp * tmp->error) + (tmp->kd * tmp->error_dot) + (tmp->ki * tmp->error_sum),0,100);
+		if (tmp->ki * tmp->error_sum > 5) garvitycompensation = 40;
+		tmp->output = constrain((tmp->kp * tmp->error) + (tmp->kd * tmp->error_dot) + (tmp->ki * tmp->error_sum + garvitycompensation),0,100);
 
 	}else{
 		tmp->time_prev  = HAL_GetTick();
@@ -174,11 +176,14 @@ void PD_position_control(void)
 	
 	Yaw_command = Smooth_filter(0.4, x_position, Yaw_command);
 	
-	relative_target_position[0] = Smooth_filter(0.6, x_position + relative_target_position[0], relative_target_position[0]);
-	relative_target_position[1] = Smooth_filter(0.6, y_position + relative_target_position[1], relative_target_position[1]);
-	relative_target_position[2] = Smooth_filter(0.6, z_position - relative_target_position[2], relative_target_position[2]);
+	float position_filter = 0.5;
+	
+	relative_target_position[0] = Smooth_filter(position_filter, x_position + relative_target_position[0], relative_target_position[0]);
+	relative_target_position[1] = Smooth_filter(position_filter, y_position + relative_target_position[1], relative_target_position[1]);
+	relative_target_position[2] = Smooth_filter(position_filter, z_position - relative_target_position[2], relative_target_position[2]);
 		
-	RotateFill(rotation_matrix, (float)q_pitch*-0.1f, (float)q_roll*-0.1f, 0);
+	//RotateFill(rotation_matrix, (float)q_pitch*-0.1f, (float)q_roll*-0.1f, 0);
+	RotateFill(rotation_matrix, (float)q_pitch*-0.1f, 0, 0);
 	MatrixMultiply(rotation_matrix, relative_target_position, ab_target_position);
 	
 	a = relative_target_position[0];
@@ -188,9 +193,11 @@ void PD_position_control(void)
 	e = ab_target_position[1];
 	f = ab_target_position[2];
 	
-	ab_target_position[0] = Smooth_filter(0.6,ab_target_position[0], ab_target_position[0]);
-	ab_target_position[1] = Smooth_filter(0.6,ab_target_position[1], ab_target_position[1]);
-	ab_target_position[2] = Smooth_filter(0.6,ab_target_position[2], ab_target_position[2]);
+	position_filter = 0.9;
+	
+	ab_target_position[0] = Smooth_filter(position_filter,ab_target_position[0], ab_target_position[0]);
+	ab_target_position[1] = Smooth_filter(position_filter,ab_target_position[1], ab_target_position[1]);
+	ab_target_position[2] = Smooth_filter(position_filter,ab_target_position[2], ab_target_position[2]);
 	
 //	x_position = x_position_tmp;
 //	y_position = y_position_tmp;
@@ -337,25 +344,25 @@ int main(void)
 
   /* USER CODE BEGIN 1 */
 
-	x_posi.kp = 0.10;
-	x_posi.ki = 0;
-	x_posi.kd = 0.14;
+	x_posi.kp = 0.09;
+	x_posi.ki = 0.000;
+	x_posi.kd = 0.08;
 
-	z_posi.ref = 440;
+	z_posi.ref = 500;
 	 
 	z_posi.kp = x_posi.kp;
-	z_posi.ki = 0;
+	z_posi.ki = x_posi.ki ;
 	z_posi.kd = x_posi.kd;
 
-	y_posi.kp = 0.1;
+	y_posi.kp = 0.18;
 	y_posi.ki = 0.2;
-	y_posi.kd = 0.14;
+	y_posi.kd = 0.25;
 
 	//////////////////////////////////////
 	 
-	yaw_posi.kp = 0.2;
+	yaw_posi.kp = 0.18;
 	yaw_posi.ki = 0.01;
-	yaw_posi.kd = 0;
+	yaw_posi.kd = 0.0;
 	 
   /* USER CODE END 1 */
 
@@ -449,6 +456,11 @@ int main(void)
 				TIM2->CCR2 = 0 ;
 				TIM3->CCR1 = 0 ;
 				TIM3->CCR2 = 0 ;
+				
+				x_posi.error_sum = 0;
+				y_posi.error_sum = 0;
+				z_posi.error_sum = 0;
+				yaw_posi.error_sum = 0;
 			}  		
 		}
   

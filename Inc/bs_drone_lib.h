@@ -78,16 +78,16 @@ volatile float T_center_minus = 0;
 volatile float y_roll=0, y_pitch=0, y0_roll=0, y0_pitch=0 ; 
 volatile float rMat[3][3] = {0};
 
-volatile float Kp_roll = 28;
-volatile float Ki_roll = 0;//7.5;
-volatile float Kd_roll = 11.25;
+volatile float Kp_roll = 27.5;
+volatile float Ki_roll = 5;//7.5;
+volatile float Kd_roll = 8.75;
 
-volatile float Kp_pitch = 128;
-volatile float Ki_pitch = 0;//7.5;
-volatile float Kd_pitch = 11.25;
+volatile float Kp_pitch = 28;
+volatile float Ki_pitch = 5;//7.5;
+volatile float Kd_pitch = 10;
 
 volatile float Kp_yaw = 12.75;
-volatile float Ki_yaw = 0;//5;
+volatile float Ki_yaw = 5;//5;
 volatile float Kd_yaw = 0;
 
 volatile float Kp_flip = 0;
@@ -103,7 +103,8 @@ int16_t ay_diff = 0;
 int16_t az_diff = 0;
 
 volatile uint8_t  calibation_pass = 0;
-volatile float  Acc_start = ACCELEROMETER_SENSITIVITY;
+volatile float  Acc_start = -ACCELEROMETER_SENSITIVITY;
+volatile float T_Az_conpensation;
 
 volatile uint8_t  spi_rx_data[spi_buffer_size] = {0};
 volatile uint8_t  spi_rx_data_index = 0;
@@ -387,7 +388,7 @@ void Read_MPU6050(void)
 		gyz_d = Smooth_filter(0.005f, rawGyrox_Z, gyz_d);
 		acx_d = Smooth_filter(0.005f, rawAccx_X, acx_d);
 		acy_d = Smooth_filter(0.005f, rawAccx_Y, acy_d);	
-		Acc_start = Smooth_filter(0.1f, (float)rawAccx_Z/ACCELEROMETER_SENSITIVITY, Acc_start);		
+		Acc_start = Smooth_filter(0.01f, (float)rawAccx_Z/ACCELEROMETER_SENSITIVITY, Acc_start);		
 		
 	}else{
 	
@@ -399,6 +400,7 @@ void Read_MPU6050(void)
 		rawAccx_Y -= ay_diff;
 	}
 }
+
 
 void PID_controller(void)
 {
@@ -438,18 +440,20 @@ void PID_controller(void)
 	Del_pitch	= (Kp_pitch * Errer_pitch)	+ (Ki_pitch	* Sum_Error_pitch) + constrain((Kd_pitch * D_Error_pitch), -1500, 1500);
 	Del_roll	= (Kp_roll  * Error_roll)	+ (Ki_roll	* Sum_Error_roll)  + constrain((Kd_roll * D_Error_roll), -1500, 1500);
 
+	//T_Az_conpensation =( (T_Az_conpensation +(Acc_start-(float)rawAccx_Z/ACCELEROMETER_SENSITIVITY))*0.002f, -3 ,3);
 	
-	motor_A = T_center +Del_pitch	+Del_roll -Del_yaw;
-	motor_B = T_center +Del_pitch	-Del_roll +Del_yaw;
-	motor_C = T_center -Del_pitch	-Del_roll -Del_yaw;
-	motor_D = T_center -Del_pitch	+Del_roll +Del_yaw;	
+	float _T_center = T_center + constrain((T_Az_conpensation*100), -300 , 300);
+	
+	motor_A = _T_center +Del_pitch	+Del_roll -Del_yaw;
+	motor_B = _T_center +Del_pitch	-Del_roll +Del_yaw;
+	motor_C = _T_center -Del_pitch	-Del_roll -Del_yaw;
+	motor_D = _T_center -Del_pitch	+Del_roll +Del_yaw;	
 	
 // for v929
 //	motor_A = T_center +Del_pitch	+Del_roll +Del_yaw;
 //	motor_B = T_center +Del_pitch	-Del_roll -Del_yaw;
 //	motor_C = T_center -Del_pitch	-Del_roll +Del_yaw;
 //	motor_D = T_center -Del_pitch	+Del_roll -Del_yaw;	
-	
 	
 //	Del_yaw		= (Kp_yaw   * Error_yaw)		+ (Ki_yaw	  * Sum_Error_yaw)   + constrain((Kd_yaw * D_Error_yaw), -1000, 1000);
 //	Del_pitch	= (Kp_pitch * Errer_pitch)	+ (Ki_pitch	* Sum_Error_pitch) + constrain((Kd_pitch * D_Error_pitch), -1000, 1000);
@@ -615,13 +619,13 @@ void getPIDgain(uint8_t spi_rx_data_index)
 
 	if (checksum_buffer == sum)
 	{
-		Kp_roll = (float)Kp_roll_tmp * 0.050f;    //	560 28
-		Ki_roll = (float)Ki_roll_tmp * 0.025f;    //	30	7.5
-		Kd_roll = (float)Kd_roll_tmp * 0.025f;    //	450	11.25
+		Kp_roll = (float)Kp_roll_tmp * 0.050f;    //	550 27.5
+		Ki_roll = (float)Ki_roll_tmp * 0.025f;    //	20	5
+		Kd_roll = (float)Kd_roll_tmp * 0.025f;    //	350	8.75
 
-		Kp_pitch = (float)Kp_pitch_tmp * 0.050f;    //	560
-		Ki_pitch = (float)Ki_pitch_tmp * 0.025f;    //	210
-		Kd_pitch = (float)Kd_pitch_tmp * 0.025f;    //	450
+		Kp_pitch = (float)Kp_pitch_tmp * 0.050f;    //	560  28
+		Ki_pitch = (float)Ki_pitch_tmp * 0.025f;    //	210  5 
+		Kd_pitch = (float)Kd_pitch_tmp * 0.025f;    //	400  10
 
 //		Kp_yaw = (float)Kp_yaw_tmp * 0.025f;
 //		Ki_yaw = (float)Ki_yaw_tmp * 0.025f;
@@ -633,7 +637,7 @@ void getPIDgain(uint8_t spi_rx_data_index)
 		
 		if (Kd_yaw_tmp < 1)
 		{
-			Kp_yaw = (float)Kp_yaw_tmp * 0.025f;    //	510	12.75
+			Kp_yaw = (float)Kp_yaw_tmp * 0.025f;    //	410	12.75
 			Ki_yaw = (float)Ki_yaw_tmp * 0.025f;    //	200	5
 			Kd_yaw = (float)Kd_yaw_tmp * 0.020f;
 			
@@ -788,7 +792,7 @@ void HAL_SPI_RxCpltCallback(SPI_HandleTypeDef *hspi)
 					{
 						sum_prev = sum2;
 						PD_position_control_state(spi_rx_data_index-13);
-						watchdog = 200;
+						watchdog = 500;
 					}		
 					spi_rx_data_index = 0;
 				}		
