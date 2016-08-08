@@ -144,7 +144,7 @@ void PID_calulate_Y(PID_state* tmp){
 		tmp->error_dot = (tmp->error - tmp->error_prev)/((float)dt*0.01f);
 		tmp->error_sum = constrain(tmp->error_sum + (tmp->error*((float)dt*0.00017f)),0,500);
 		
-		if (tmp->ki * tmp->error_sum > 5) garvitycompensation = 40;
+		if (tmp->ki * tmp->error_sum > 5) garvitycompensation = 50;
 		tmp->output = constrain((tmp->kp * tmp->error) + (tmp->kd * tmp->error_dot) + (tmp->ki * tmp->error_sum + garvitycompensation),0,100);
 
 	}else{
@@ -174,7 +174,7 @@ void PD_position_control(void)
 	relative_target_position[1] =  target_position[2]*alpha;
 	relative_target_position[2] =  target_position[2]*gramma;
 	
-	Yaw_command = Smooth_filter(0.4, x_position, Yaw_command);
+	Yaw_command = Smooth_filter(0.7, x_position, Yaw_command);
 	
 	float position_filter = 0.5;
 	
@@ -344,9 +344,9 @@ int main(void)
 
   /* USER CODE BEGIN 1 */
 
-	x_posi.kp = 0.09;
+	x_posi.kp = 0.08;
 	x_posi.ki = 0.000;
-	x_posi.kd = 0.08;
+	x_posi.kd = 0.09;
 
 	z_posi.ref = 500;
 	 
@@ -354,9 +354,9 @@ int main(void)
 	z_posi.ki = x_posi.ki ;
 	z_posi.kd = x_posi.kd;
 
-	y_posi.kp = 0.18;
-	y_posi.ki = 0.2;
-	y_posi.kd = 0.25;
+	y_posi.kp = 0.15;
+	y_posi.ki = 0.15;
+	y_posi.kd = 0.27;
 
 	//////////////////////////////////////
 	 
